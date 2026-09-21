@@ -1,0 +1,20 @@
+{
+  "status": "COMPLETED_ON_PHYSICAL_QPU",
+  "backend": "ibm_fez",
+  "job_id": "daor3p5r85ps73ffmvn0",
+  "ansatz": "UCCSD",
+  "parameter_vector": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "optimization_level": 3,
+  "resilience_options": "default",
+  "shots": 4096,
+  "transpiled_depth": 1,
+  "transpiled_2q_gates": 0,
+  "qpu_seconds": 30.35,
+  "measured_energy_ha": -639.7236460864065,
+  "exact_casci_energy_ha": -639.724283227178,
+  "error_mha": 0.6371407715732857
+}

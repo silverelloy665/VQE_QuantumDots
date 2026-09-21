@@ -18,7 +18,13 @@ def get_runtime_service(
     Initializes and returns an instance of QiskitRuntimeService.
     Falls back to environment variables or saved local disk credentials.
     """
-    token = token or os.getenv("IBM_QUANTUM_TOKEN")
+    token = (
+        token
+        or os.getenv("IBM_QUANTUM_TOKEN")
+        or os.getenv("IBMQ_API_KEY")
+        or os.getenv("IBM_QUANTUM_API_KEY")
+        or os.getenv("QISKIT_IBM_TOKEN")
+    )
     channel = channel or os.getenv("IBM_QUANTUM_CHANNEL", "ibm_quantum_platform")
     
     try:
@@ -36,4 +42,3 @@ if __name__ == "__main__":
     backends = [b.name for b in service.backends()]
     print(f"[OK] IBM Quantum Service initialized successfully!")
     print(f"Available backends: {backends}")
-

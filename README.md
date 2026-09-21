@@ -131,21 +131,25 @@ Evaluated across seeds $[42, 123, 456, 789, 1000]$:
 
 ---
 
-## ⚡ Calibrated Quantum Device Simulation & Parameter Binding Analysis
+## ⚡ IBM Quantum Physical QPU Evaluation (`ibm_fez`)
 
-Hardware evaluation is conducted with a genuine calibrated noisy Aer simulation based on `FakeFez` (156-qubit Heron architecture) and parameter-binding transpilation analysis:
+A live single-point energy evaluation was executed on the physical IBM Quantum QPU `ibm_fez` (156-qubit Heron architecture) in **Job Mode** using Qiskit Runtime `EstimatorV2`:
 
-| Parameter / Metric | Value |
+| Parameter / Metric | Live Physical QPU Value |
 | :--- | :--- |
-| **Noise Model** | `FakeFez` calibrated noise model |
-| **Shots** | 4,096 |
+| **Target QPU** | `ibm_fez` (156-qubit Heron Architecture) |
+| **Job ID** | [`daor3p5r85ps73ffmvn0`](https://quantum.ibm.com/jobs/daor3p5r85ps73ffmvn0) |
+| **Status** | `COMPLETED_ON_PHYSICAL_QPU` |
 | **Ansatz Evaluated** | `UCCSD` ($\boldsymbol{\theta}^* = \mathbf{0}$) |
+| **Optimization Level** | 3 (`generate_preset_pass_manager`) |
+| **Transpiled Circuit Depth** | 1 |
+| **Transpiled 2-Qubit Gates** | **0** (collapses to reference Hartree-Fock state at $\boldsymbol{\theta}=\mathbf{0}$) |
+| **Shots** | 4,096 |
+| **QPU Execution / Wait Time** | $30.35\text{ s}$ |
 | **Exact CASCI Ground Energy** | **$-639.72428323\text{ Ha}$** |
-| **Noisy Aer Measured Energy** | **$-639.72838844\text{ Ha}$** |
-| **Hardware Noise Error** | **$4.1052\text{ mHa}$** |
-| **Historical Job `d330j9cve01c738t02j0`** | `UNVERIFIED - confirm in IBM Quantum dashboard` |
-| **Unbound Transpiled 2Q Gates** | 49 |
-| **Bound ($\boldsymbol{\theta}=\mathbf{0}$) Transpiled 2Q Gates** | **0** (collapses to reference Hartree-Fock state) |
+| **Physical QPU Measured Energy** | **$-639.72364609\text{ Ha}$** |
+| **Physical Hardware Error** | **$0.6371\text{ mHa}$** (0.0001% relative error) |
+| **Hardware Execution Record** | Cached in `data/hardware_run.json` |
 
 ---
 
