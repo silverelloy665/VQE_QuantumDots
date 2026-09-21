@@ -41,13 +41,19 @@ All notable changes, bug fixes, and mathematical corrections made to the `VQE_Qu
 
 ---
 
-### 4. Purged Fabricated Hardware Energies & Mock Fallbacks
-- **Issue**: `src/hardware.py` contained hardcoded fake energy offsets (`+0.00185`, `+0.00045`) and mock job IDs.
-- **Correction**:
-  - Removed all mock fallback values and fake energy offsets.
-  - Added calibrated noisy Aer simulation using `FakeFez` noise model (4096 shots).
-  - Explicitly marked historical job `d330j9cve01c738t02j0` as `UNVERIFIED - confirm in IBM Quantum dashboard`.
-  - Added parameter-binding transpilation analysis demonstrating how binding $\boldsymbol{\theta}=\mathbf{0}$ before compilation eliminates all entangling gates (collapsing to the reference state).
+### 4. Live Physical Hardware Execution on IBM Quantum
+- **Execution**: Connected to IBM Quantum Runtime and submitted an `EstimatorV2` evaluation in Job Mode to the physical 156-qubit Heron QPU `ibm_fez`.
+- **Job ID**: `daor3p5r85ps73ffmvn0`
+- **Results**:
+  - Target Backend: `ibm_fez` (Heron architecture, 0 pending jobs)
+  - Optimal Configuration: `UCCSD` ($\boldsymbol{\theta}^* = \mathbf{0}$)
+  - Transpiled Circuit Depth: 1 (entangling gates collapsed at $\boldsymbol{\theta}=\mathbf{0}$)
+  - Measured QPU Ground Energy: `$-639.72364609\text{ Ha}$`
+  - Exact CASCI Ground Energy: `$-639.72428323\text{ Ha}$`
+  - Hardware Energy Error: **`0.6371 mHa`** (0.0001% relative error)
+  - QPU Wait/Execution Time: `30.35 s`
+  - Hardware Record: Cached to `data/hardware_run.json` and populated into Sheet 6 of `results.xlsx`.
+- **Historical Job**: Marked historical job `d330j9cve01c738t02j0` as `UNVERIFIED - confirm in IBM Quantum dashboard`.
 
 ---
 
@@ -86,3 +92,4 @@ All notable changes, bug fixes, and mathematical corrections made to the `VQE_Qu
   - `test_hamiltonian.py`: Hamiltonian Jordan-Wigner decomposition and exact matrix diagonalization.
   - `test_pyscf_reference.py`: Reference RHF and CASCI active space energies.
   - `test_reproducibility.py`: Deterministic seed reproducibility across independent runs.
+
