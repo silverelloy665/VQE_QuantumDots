@@ -5,9 +5,8 @@ Includes 5 formatted sheets and native Excel charts.
 from pathlib import Path
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.formatting.rule import ColorScaleRule
-from openpyxl.chart import BarChart, LineChart, Reference, Series
+from openpyxl.chart import BarChart, LineChart, Reference
 import pandas as pd
 
 def style_header_row(ws, row_idx: int, num_cols: int, bg_color: str | None = None, fg_color: str = "000000"):
@@ -53,7 +52,6 @@ def export_benchmark_to_excel(
     Generates the comprehensive results.xlsx workbook with 5 sheets and native charts.
     """
     wb = openpyxl.Workbook()
-    # Remove default sheet
     wb.remove(wb.active)
     
     # -------------------------------------------------------------
@@ -240,7 +238,6 @@ def export_benchmark_to_excel(
     c_data_end_r = curr_r - 1
 
     # Add Native Excel Charts to Summary Sheet
-    # Chart A: Error by Ansatz (Best configuration)
     chart_err = BarChart()
     chart_err.type = "col"
     chart_err.style = 10
@@ -255,7 +252,6 @@ def export_benchmark_to_excel(
     chart_err.set_categories(cats_ref)
     ws_sum.add_chart(chart_err, "H2")
     
-    # Chart B: Circuit Depth & Parameter Count per Ansatz
     chart_circ = BarChart()
     chart_circ.type = "col"
     chart_circ.style = 11
@@ -270,7 +266,6 @@ def export_benchmark_to_excel(
     chart_circ.set_categories(circ_cats)
     ws_sum.add_chart(chart_circ, "H18")
     
-    # Chart C: Runtime Comparison per Optimizer
     chart_time = BarChart()
     chart_time.type = "col"
     chart_time.style = 13
@@ -285,7 +280,6 @@ def export_benchmark_to_excel(
     chart_time.set_categories(time_cats)
     ws_sum.add_chart(chart_time, "H34")
     
-    # Chart D: Convergence Trajectories (Reference from Convergence sheet)
     chart_conv = LineChart()
     chart_conv.title = "VQE Convergence Trajectories (UCCSD Ansatz)"
     chart_conv.style = 12
@@ -293,7 +287,6 @@ def export_benchmark_to_excel(
     chart_conv.x_axis.title = "Iteration"
     chart_conv.width = 18
     chart_conv.height = 11
-    # Locate UCCSD columns in Convergence sheet
     conv_cols = [idx + 1 for idx, col in enumerate(headers) if "UCCSD" in col][:4]
     if conv_cols:
         for c_idx in conv_cols:
@@ -340,8 +333,6 @@ def export_benchmark_to_excel(
         
     autofit_column_widths(ws_hw)
     
-    # Save Workbook
     wb.save(output_path)
     print(f"[OK] Exported results to {output_path} with 5 sheets and native charts.")
     return output_path
-
