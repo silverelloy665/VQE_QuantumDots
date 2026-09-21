@@ -10,20 +10,22 @@ from openpyxl.formatting.rule import ColorScaleRule
 from openpyxl.chart import BarChart, LineChart, Reference, Series
 import pandas as pd
 
-def style_header_row(ws, row_idx: int, num_cols: int, bg_color: str = "1F4E79", fg_color: str = "FFFFFF"):
-    """Applies corporate header formatting to a given row."""
-    header_fill = PatternFill(start_color=bg_color, end_color=bg_color, fill_type="solid")
+def style_header_row(ws, row_idx: int, num_cols: int, bg_color: str | None = None, fg_color: str = "000000"):
+    """Applies clean neutral header formatting to a given row without color fill."""
     header_font = Font(name="Calibri", size=11, bold=True, color=fg_color)
     align = Alignment(horizontal="center", vertical="center", wrap_text=True)
     thin_border = Border(
         left=Side(style="thin", color="D9D9D9"),
         right=Side(style="thin", color="D9D9D9"),
         top=Side(style="thin", color="D9D9D9"),
-        bottom=Side(style="medium", color=bg_color)
+        bottom=Side(style="medium", color="595959")
     )
     for col_idx in range(1, num_cols + 1):
         cell = ws.cell(row=row_idx, column=col_idx)
-        cell.fill = header_fill
+        if bg_color:
+            cell.fill = PatternFill(start_color=bg_color, end_color=bg_color, fill_type="solid")
+        else:
+            cell.fill = PatternFill(fill_type=None)
         cell.font = header_font
         cell.alignment = align
         cell.border = thin_border
@@ -92,9 +94,9 @@ def export_benchmark_to_excel(
         ws_cfg.append(r)
         
     ws_cfg.merge_cells("A1:B1")
-    ws_cfg["A1"].font = Font(name="Calibri", size=14, bold=True, color="1F4E79")
+    ws_cfg["A1"].font = Font(name="Calibri", size=14, bold=True, color="000000")
     ws_cfg["A1"].alignment = Alignment(horizontal="center", vertical="center")
-    style_header_row(ws_cfg, 2, 2, bg_color="2F5597")
+    style_header_row(ws_cfg, 2, 2)
     autofit_column_widths(ws_cfg)
     
     # -------------------------------------------------------------
@@ -108,7 +110,7 @@ def export_benchmark_to_excel(
         "Final Energy (Ha)", "Exact Energy (Ha)", "Error (mHa)", "Rel Error (%)",
         "Wall Time (s)", "Iterations"
     ])
-    style_header_row(ws_res, 1, 11, bg_color="1F4E79")
+    style_header_row(ws_res, 1, 11)
     
     for idx, row in results_df.iterrows():
         ws_res.append([
@@ -150,7 +152,7 @@ def export_benchmark_to_excel(
     
     headers = list(convergence_df.columns)
     ws_conv.append(headers)
-    style_header_row(ws_conv, 1, len(headers), bg_color="2F5597")
+    style_header_row(ws_conv, 1, len(headers))
     
     for _, row in convergence_df.iterrows():
         ws_conv.append([float(val) if isinstance(val, (int, float)) else val for val in row])
@@ -170,8 +172,8 @@ def export_benchmark_to_excel(
     ws_sum.append(["Best Configuration per Ansatz", "", "", "", "", ""])
     ws_sum.append(["Ansatz", "Best Init", "Best Optimizer", "Final Energy (Ha)", "Error (mHa)", "Wall Time (s)"])
     ws_sum.merge_cells("A1:F1")
-    ws_sum["A1"].font = Font(name="Calibri", size=13, bold=True, color="1F4E79")
-    style_header_row(ws_sum, 2, 6, bg_color="1F4E79")
+    ws_sum["A1"].font = Font(name="Calibri", size=13, bold=True, color="000000")
+    style_header_row(ws_sum, 2, 6)
     
     best_per_ansatz = results_df.sort_values(by="Error_mHa").groupby("Ansatz", as_index=False).first()
     for _, row in best_per_ansatz.iterrows():
@@ -187,7 +189,7 @@ def export_benchmark_to_excel(
     row_offset = len(best_per_ansatz) + 4
     # Summary Table 2: Optimizer Performance Overview
     ws_sum.cell(row=row_offset, column=1, value="Optimizer Performance Overview")
-    ws_sum.cell(row=row_offset, column=1).font = Font(name="Calibri", size=13, bold=True, color="1F4E79")
+    ws_sum.cell(row=row_offset, column=1).font = Font(name="Calibri", size=13, bold=True, color="000000")
     ws_sum.merge_cells(start_row=row_offset, start_column=1, end_row=row_offset, end_column=5)
     
     ws_sum.cell(row=row_offset+1, column=1, value="Optimizer")
@@ -195,7 +197,7 @@ def export_benchmark_to_excel(
     ws_sum.cell(row=row_offset+1, column=3, value="Min Error (mHa)")
     ws_sum.cell(row=row_offset+1, column=4, value="Mean Time (s)")
     ws_sum.cell(row=row_offset+1, column=5, value="Total Runs")
-    style_header_row(ws_sum, row_offset+1, 5, bg_color="2F5597")
+    style_header_row(ws_sum, row_offset+1, 5)
     
     opt_summary = results_df.groupby("Optimizer").agg(
         Mean_Error=("Error_mHa", "mean"),
@@ -216,14 +218,14 @@ def export_benchmark_to_excel(
     curr_r += 2
     # Summary Table 3: Circuit Complexity
     ws_sum.cell(row=curr_r, column=1, value="Circuit Complexity Comparison")
-    ws_sum.cell(row=curr_r, column=1).font = Font(name="Calibri", size=13, bold=True, color="1F4E79")
+    ws_sum.cell(row=curr_r, column=1).font = Font(name="Calibri", size=13, bold=True, color="000000")
     ws_sum.merge_cells(start_row=curr_r, start_column=1, end_row=curr_r, end_column=6)
     
     c_header_r = curr_r + 1
     c_headers = ["Ansatz", "Parameters", "Raw Depth", "Raw 2Q Gates", "Transpiled Depth", "Transpiled 2Q Gates"]
     for c_i, ch in enumerate(c_headers, 1):
         ws_sum.cell(row=c_header_r, column=c_i, value=ch)
-    style_header_row(ws_sum, c_header_r, len(c_headers), bg_color="1F4E79")
+    style_header_row(ws_sum, c_header_r, len(c_headers))
     
     curr_r = c_header_r + 1
     c_data_start_r = curr_r
@@ -312,8 +314,8 @@ def export_benchmark_to_excel(
     ws_hw.append(["IBM Quantum Hardware Benchmark Results", ""])
     ws_hw.append(["Metric", "Value"])
     ws_hw.merge_cells("A1:B1")
-    ws_hw["A1"].font = Font(name="Calibri", size=13, bold=True, color="1F4E79")
-    style_header_row(ws_hw, 2, 2, bg_color="1F4E79")
+    ws_hw["A1"].font = Font(name="Calibri", size=13, bold=True, color="000000")
+    style_header_row(ws_hw, 2, 2)
     
     hw_info = hardware_data or {
         "Status": "Evaluated on IBM Quantum Hardware / Fake Backend",
