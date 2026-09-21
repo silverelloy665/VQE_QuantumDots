@@ -37,7 +37,6 @@ env/
 # Output & Logs
 logs/
 results/
-data/
 *.log
-!data/*.json
+
 

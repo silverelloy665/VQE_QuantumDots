@@ -1,189 +1,239 @@
 # Hexagonal Boron-Nitride ($B_8N_8H_{10}$) Quantum Dot VQE Benchmark
 
-A reproducible quantum chemistry benchmarking project implementing the Variational Quantum Eigensolver (VQE) to compute the ground-state electronic energy of a **hexagonal boron-nitride ($B_8N_8H_{10}$, 26 atoms) quantum dot** ("BN quantum dot").
+A mathematically rigorous and reproducible quantum chemistry benchmarking project implementing the Variational Quantum Eigensolver (VQE) to compute the ground-state electronic energy of a **hexagonal boron-nitride ($B_8N_8H_{10}$, 26 atoms) quantum dot** ("BN quantum dot").
 
-This project reproduces and extends the methodology from *VQE_Config_Si.pdf* across a full factorial grid:
-**4 Ansätze $\times$ 4 Initializations $\times$ 4 Optimizers = 64 VQE Configurations (50 iterations each)**.
+This repository benchmarks across a full factorial grid:
+**4 Ansätze $\times$ 4 Initializations $\times$ 4 Optimizers = 64 VQE Configurations (50 iterations each)**, with learning rate sweeps, 5-seed random initialization robustness testing, active-space scaling analysis, and calibrated noisy quantum hardware simulation.
 
 ---
 
 ## 🔬 System Overview: Hexagonal BN Quantum Dot
 
-- **Stoichiometry**: $B_8 N_8 H_{10}$ (26 atoms)
-- **Geometry**: Planar hexagonal lattice ($z = 0$, $D_{3h}$ symmetry core, hydrogen-terminated perimeter)
-- **Charge / Spin**: Charge = $0$, Spin Multiplicity = $1$ (Singlet, $S=0$)
-- **Active Space**: $(2e, 2o)$ active space around the HOMO/LUMO boundary
+- **Stoichiometry**: $B_8 N_8 H_{10}$ (26 atoms: 8 Boron, 8 Nitrogen, 10 Hydrogen)
+- **Geometry**: Planar hexagonal lattice ($z = 0$, $D_{3h}$ core symmetry, hydrogen-passivated boundary)
+- **Electronic Structure**: Neutral singlet ($Q = 0, S = 0$, 106 total electrons)
+- **Active Space**: $(2e, 2o)$ active space around the HOMO/LUMO frontier
 - **Qubit Encoding**: 4 qubits via Jordan-Wigner transformation
-- **Hamiltonian**: 27 Pauli operator terms (identity shift + 1-body & 2-body electronic integrals)
+- **Hamiltonian**: 27 Pauli operator terms ($I$, $Z_i$, $Z_i Z_j$, $X_i X_j Y_k Y_l$, etc.)
 
-### Reference Electronic Energies
-| Basis Set | RHF Energy (Hartree) | Exact Active Space Ground Energy (Hartree) |
-| :--- | :--- | :--- |
-| **STO-3G** (Smoke Test) | $-631.70087799\text{ Ha}$ | **$-631.74178346\text{ Ha}$** |
-| **6-31G(d,p)** (Production) | $-639.68334407\text{ Ha}$ | **$-639.72428323\text{ Ha}$** |
+### Reference Electronic Energies (PySCF 2.14.0)
+| Basis Set / Active Space | RHF Energy (Hartree) | Exact Active CASCI (Hartree) | Active Correlation Energy $E_{\text{corr}}$ |
+| :--- | :--- | :--- | :--- |
+| **STO-3G $(2e, 2o)$** (Smoke Test) | $-631.74167448\text{ Ha}$ | **$-631.74178346\text{ Ha}$** | $0.10897\text{ mHa}$ |
+| **6-31G(d,p) $(2e, 2o)$** (Production) | $-639.72424230\text{ Ha}$ | **$-639.72428323\text{ Ha}$** | $0.04093\text{ mHa}$ |
+| **6-31G(d,p) $(4e, 4o)$** (Scaled) | $-639.72424230\text{ Ha}$ | **$-639.72453605\text{ Ha}$** | $0.29375\text{ mHa}$ |
+| **6-31G(d,p) $(6e, 6o)$** (Scaled) | $-639.72424230\text{ Ha}$ | **$-639.72562598\text{ Ha}$** | $1.38368\text{ mHa}$ |
+| **6-31G(d,p) B3LYP $(2e, 2o)$** | $-639.72424230\text{ Ha}$ | **$-639.72428323\text{ Ha}$** | $0.04093\text{ mHa}$ |
+
+> **Note on Active Space Correlation**: In the $(2e, 2o)$ frontier active space, the Hartree-Fock state $|0101\rangle$ is already within $0.041\text{ mHa}$ of the exact ground state due to the strong closed-shell ionic bonding of BN quantum dots. Multi-orbital active space scaling shows that $E_{\text{corr}}$ grows systematically from $0.041\text{ mHa} \to 0.294\text{ mHa} \to 1.384\text{ mHa}$ as $(4e, 4o)$ and $(6e, 6o)$ active spaces incorporate dynamic correlation.
 
 ---
 
 ## 📐 Benchmark Factorial Grid ($4 \times 4 \times 4 = 64$ Configurations)
 
 ### 1. Ansätze (4)
-1. **DexcG**: UCC with double excitation operators (`excitations='d'`).
-2. **PCU2**: Custom `ParticleConservingU2` with 2 layers of single-qubit $R_Z$ rotations and alternating $CNOT-CRX-CNOT$ blocks preserving particle number $\eta=2$.
-3. **UCCSD**: UCC with single and double excitations (`excitations='sd'`).
-4. **k-UpCCGSD**: Unitary paired coupled-cluster generalized single and double excitations with $k=3$ repetitions.
+1. **DexcG**: UCC with double excitation operators (`excitations='d'`, 1 variational parameter).
+2. **PCU2**: Custom `ParticleConservingU2` with 2 layers preserving particle number $\eta=2$ (14 variational parameters).
+3. **UCCSD**: Unitary Coupled Cluster with Singles and Doubles (`excitations='sd'`, 3 variational parameters).
+4. **k-UpCCGSD**: Generalized UCC with $k=3$ repetitions (`generalized=True`, `reps=3`, 9 variational parameters).
 
 ### 2. Parameter Initializations (4)
-1. **Zero**: $\boldsymbol{\theta}_0 = \mathbf{0}$ (corresponds directly to the Hartree-Fock state for UCC ansätze).
+1. **Zero**: $\boldsymbol{\theta}_0 = \mathbf{0}$ (corresponds exactly to the Hartree-Fock state for UCC ansätze).
 2. **Half**: $\boldsymbol{\theta}_0 = 0.5 \cdot \mathbf{1}$.
 3. **One**: $\boldsymbol{\theta}_0 = 1.0 \cdot \mathbf{1}$.
-4. **Random**: $\boldsymbol{\theta}_0 \sim \mathcal{U}(0, 2\pi)$.
+4. **Random**: $\boldsymbol{\theta}_0 \sim \mathcal{U}(0, 1)$ with fixed seed $42$.
 
 ### 3. Classical Optimizers (4)
-1. **GD**: Gradient Descent with momentum ($\text{lr}=0.1, \beta=0.9$).
+1. **GD**: Gradient Descent ($\text{lr}=0.05$).
 2. **ADAM**: Adaptive Moment Estimation ($\text{lr}=0.05, \beta_1=0.9, \beta_2=0.999$).
-3. **SPSA**: Simultaneous Perturbation Stochastic Approximation ($a=0.1, c=0.1, \alpha=0.602, \gamma=0.101$).
-4. **QNSPSA**: Quantum Natural SPSA with Fubini-Study metric tensor approximation ($a=0.1, c=0.1$).
+3. **SPSA**: Simultaneous Perturbation Stochastic Approximation ($\text{lr}=0.1, c=0.1$).
+4. **QNSPSA**: Quantum Natural SPSA with state fidelity quantum metric tensor ($\text{lr}=0.1, c=0.1$).
+
+---
+
+## 🧮 Gradient Computation & Parameter-Shift Failure Correction
+
+UCC excitation operators under Jordan-Wigner transformation contain Pauli string generators $G_k$ (e.g. $X_0 X_1 Y_2 X_3$). The energy response $E(\theta) = \langle \text{HF} | e^{-\theta G} H e^{\theta G} | \text{HF} \rangle$ is strictly $\pi$-periodic in $\theta$, meaning $E(\theta + \pi/2) - E(\theta - \pi/2) \equiv 0$ identically everywhere.
+
+Consequently, standard single-generator $\pi/2$ parameter-shift rules yield a gradient of **0.000000** at all test points. 
+
+**Correction Implemented**: Vectorized **central finite differences** ($\epsilon = 10^{-5}$) evaluating all $2N$ parameter points simultaneously in a **single batched PUB call**:
+$$\frac{\partial E(\boldsymbol{\theta})}{\partial \theta_i} \approx \frac{E(\boldsymbol{\theta} + \epsilon \mathbf{e}_i) - E(\boldsymbol{\theta} - \epsilon \mathbf{e}_i)}{2\epsilon}$$
+This provides numerically exact, monotonically descending gradients for GD and ADAM across all ansätze.
 
 ---
 
 ## 📊 Circuit Structural & Hardware Transpilation Metrics
 
-Each circuit is mapped to 4 qubits and transpiled against IBM Quantum backend (`ibm_fez` / `ibm_sherbrooke` architecture):
+Circuits transpiled against IBM Quantum Heron / Eagle architecture (`GenericBackendV2(5)`, `optimization_level=3`):
 
-| Ansatz | Variational Parameters | Native 2Q Gates | Transpiled Circuit Depth | Transpiled 2Q Gates | Transpiled Single-Qubit Gates |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **DexcG** | 1 | 8 | 136 | 42 | 98 |
-| **PCU2** | 16 | 6 | 66 | 18 | 66 |
-| **UCCSD** | 3 | 10 | 124 | 49 | 82 |
-| **k-UpCCGSD** ($k=3$) | 12 | 30 | 372 | 145 | 288 |
+| Ansatz | Variational Parameters | Native 2Q Gates | Raw Circuit Depth | Transpiled Circuit Depth | Transpiled 2Q Gates | Transpiled 1Q Gates |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **DexcG** | 1 | 8 | 28 | 111 | 42 | 69 |
+| **PCU2** | 14 | 6 | 12 | 65 | 18 | 47 |
+| **UCCSD** | 3 | 10 | 32 | 124 | 49 | 75 |
+| **k-UpCCGSD** ($k=3$) | 9 | 30 | 96 | 372 | 145 | 227 |
 
-> **Constraint Verification**: All transpiled circuits require $< 300$ two-qubit gates, satisfying near-term physical QPU coherence limits.
+> **Hardware Feasibility**: All transpiled circuits require $\le 145$ two-qubit gates, well within physical QPU coherence limits ($< 300$ 2Q gates). `PCU2` achieves the shallowest transpiled depth (65) and fewest 2Q gates (18).
 
 ---
 
-## 🏆 Key Benchmark Results & Analysis
+## 🏆 Top Configurations & Multi-Tier Tie Ranking
 
-### Top 5 Overall Configurations
-| Rank | Ansatz | Initialization | Optimizer | Final Energy (Ha) | Error (mHa) | Relative Error (%) | Runtime (s) |
-| :---: | :--- | :--- | :--- | :---: | :---: | :---: | :---: |
-| **1** | **DexcG** | **zero** | **QNSPSA** | **$-639.724283$** | **$0.000213$** | $3.34 \times 10^{-7}\%$ | $19.2\text{ s}$ |
-| **2** | **DexcG** | **zero** | **SPSA** | **$-639.724283$** | **$0.000213$** | $3.34 \times 10^{-7}\%$ | $4.52\text{ s}$ |
-| **3** | **DexcG** | **random** | **SPSA** | **$-639.724283$** | **$0.000213$** | $3.34 \times 10^{-7}\%$ | $18.99\text{ s}$ |
-| **4** | **DexcG** | **random** | **QNSPSA** | **$-639.724283$** | **$0.000213$** | $3.34 \times 10^{-7}\%$ | $55.33\text{ s}$ |
-| **5** | **DexcG** | **half** | **SPSA** | **$-639.724283$** | **$0.000213$** | $3.34 \times 10^{-7}\%$ | $8.22\text{ s}$ |
+Configurations ranked with explicit multi-tier tie breaking:
+$$\text{Primary: } \text{Error (mHa)} \longrightarrow \text{Secondary: } \text{Total Function Evaluations} \longrightarrow \text{Tertiary: } \text{Wall-Clock Time (s)}$$
+
+| Rank | Ansatz | Initialization | Optimizer | Final Energy (Ha) | Error (mHa) | % Corr Recovered | Total Evals | Wall Time (s) |
+| :---: | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| **1** | **UCCSD** | **random** | **GD** | **$-639.72428323$** | **$1.14 \times 10^{-10}$** | $100.00\%$ | 351 | $6.10\text{ s}$ |
+| **2** | **UCCSD** | **zero** | **GD** | **$-639.72428323$** | **$1.14 \times 10^{-10}$** | $100.00\%$ | 351 | $6.65\text{ s}$ |
+| **3** | **UCCSD** | **one** | **GD** | **$-639.72428323$** | **$2.27 \times 10^{-10}$** | $100.00\%$ | 351 | $6.96\text{ s}$ |
+| **4** | **UCCSD** | **half** | **GD** | **$-639.72428323$** | **$3.41 \times 10^{-10}$** | $100.00\%$ | 351 | $6.33\text{ s}$ |
+| **5** | **k-UpCCGSD** | **zero** | **GD** | **$-639.72428321$** | **$2.04 \times 10^{-05}$** | $99.95\%$ | 951 | $38.08\text{ s}$ |
+| **6** | **DexcG** | **zero** | **QNSPSA** | **$-639.72428301$** | **$2.13 \times 10^{-04}$** | $99.48\%$ | 179 | $4.97\text{ s}$ |
+| **7** | **DexcG** | **half** | **GD** | **$-639.72428301$** | **$2.13 \times 10^{-04}$** | $99.48\%$ | 151 | $1.34\text{ s}$ |
+| **8** | **DexcG** | **zero** | **GD** | **$-639.72428301$** | **$2.13 \times 10^{-04}$** | $99.48\%$ | 151 | $1.27\text{ s}$ |
+| **9** | **DexcG** | **zero** | **SPSA** | **$-639.72428301$** | **$2.13 \times 10^{-04}$** | $99.48\%$ | 153 | $1.26\text{ s}$ |
+| **10** | **DexcG** | **random** | **GD** | **$-639.72428301$** | **$2.13 \times 10^{-04}$** | $99.48\%$ | 151 | $1.32\text{ s}$ |
 
 ### Optimizer Performance Summary
-| Optimizer | Mean Error (mHa) | Min Error (mHa) | Mean Time per Run (s) | Sub-mHa Success Rate (< 1 mHa) |
-| :--- | :---: | :---: | :---: | :---: |
-| **QNSPSA** | $1.29\text{ mHa}$ | $0.0002\text{ mHa}$ | $29.8\text{ s}$ | **$68.8\%$** |
-| **SPSA** | $7.98\text{ mHa}$ | $0.0002\text{ mHa}$ | **$7.8\text{ s}$** | **$62.5\%$** |
-| **ADAM** | $197.8\text{ mHa}$ | $0.0409\text{ mHa}$ | $30.4\text{ s}$ | $37.5\%$ |
-| **GD** | $228.1\text{ mHa}$ | $0.0409\text{ mHa}$ | $44.9\text{ s}$ | $31.3\%$ |
+| Optimizer | Mean Error (mHa) | Min Error (mHa) | Mean Evals | Mean Time (s) | Success Rate (< 1 mHa) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **ADAM** | $0.898\text{ mHa}$ | $8.30 \times 10^{-3}\text{ mHa}$ | 726.0 | $12.38\text{ s}$ | **$81.25\%$** |
+| **GD** | $3.009\text{ mHa}$ | $1.14 \times 10^{-10}\text{ mHa}$ | 726.0 | $12.62\text{ s}$ | **$75.00\%$** |
+| **QNSPSA** | $1.004\text{ mHa}$ | $2.13 \times 10^{-4}\text{ mHa}$ | 179.0 | $11.59\text{ s}$ | **$75.00\%$** |
+| **SPSA** | $9.145\text{ mHa}$ | $2.13 \times 10^{-4}\text{ mHa}$ | **153.0** | **$2.96\text{ s}$** | $68.75\%$ |
 
 ---
 
-## 💡 Comparison with Paper Findings (*VQE_Config_Si.pdf*)
+## 🎲 Random Initialization Robustness (5 Fixed Seeds)
 
-1. **Agreement with Reference Paper**:
-   - **Zero-Initialization** is unequivocally superior for chemistry-inspired ansätze (UCCSD, DexcG). Because $\boldsymbol{\theta}=\mathbf{0}$ yields the Hartree-Fock state ($|\Psi_{\text{HF}}\rangle = |1100\rangle$), starting at zero avoids barren plateaus and local minima traps.
-   - **Hardware Efficiency vs. Accuracy**: `PCU2` requires by far the fewest 2-qubit gates (18 transpiled) and achieves $< 0.1\text{ mHa}$ error, making it exceptionally resilient to two-qubit gate noise on physical QPUs.
-   
-2. **Key Distinctions in the BN Quantum Dot System**:
-   - The BN quantum dot exhibits strong ionic B–N bonding character with a wide HOMO-LUMO gap. Consequently, the ground state is dominated by the double-excitation transition ($|1100\rangle \to |0011\rangle$).
-   - As a result, **DexcG** (with only 1 parameter) reaches absolute machine precision ($0.0002\text{ mHa}$) faster and with higher stability across all initializations than the 12-parameter `k-UpCCGSD`.
+Evaluated across seeds $[42, 123, 456, 789, 1000]$:
+
+| Ansatz | Optimizer | Mean Error (mHa) | Std Error (mHa) | Min Error (mHa) | Max Error (mHa) | Mean % Corr |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| **DexcG** | **GD** | $0.000213$ | $0.000000$ | $0.000213$ | $0.000213$ | $99.48\%$ |
+| **DexcG** | **ADAM** | $0.008304$ | $0.000000$ | $0.008304$ | $0.008304$ | $79.71\%$ |
+| **DexcG** | **SPSA** | $0.000499$ | $0.000244$ | $0.000213$ | $0.000880$ | $98.78\%$ |
+| **DexcG** | **QNSPSA** | $0.000346$ | $0.000109$ | $0.000213$ | $0.000480$ | $99.15\%$ |
+| **PCU2** | **GD** | $1.527339$ | $2.842777$ | $0.000213$ | $7.135843$ | $-3632.17\%$ |
+| **PCU2** | **ADAM** | $0.155459$ | $0.231267$ | $0.008304$ | $0.618080$ | $-279.79\%$ |
+| **PCU2** | **SPSA** | $0.003975$ | $0.003290$ | $0.000806$ | $0.009493$ | $90.29\%$ |
+| **PCU2** | **QNSPSA** | $0.001633$ | $0.001150$ | $0.000343$ | $0.003328$ | $96.01\%$ |
+| **UCCSD** | **GD** | $0.000000$ | $0.000000$ | $0.000000$ | $0.000000$ | $100.00\%$ |
+| **UCCSD** | **ADAM** | $0.008304$ | $0.000000$ | $0.008304$ | $0.008304$ | $79.71\%$ |
+| **UCCSD** | **SPSA** | $0.000624$ | $0.000305$ | $0.000213$ | $0.000966$ | $98.48\%$ |
+| **UCCSD** | **QNSPSA** | $0.000349$ | $0.000164$ | $0.000213$ | $0.000641$ | $99.15\%$ |
+| **k-UpCCGSD** | **GD** | $10.508688$ | $15.526233$ | $0.000000$ | $39.467431$ | $-25575.52\%$ |
+| **k-UpCCGSD** | **ADAM** | $3.418047$ | $2.709325$ | $0.008304$ | $6.974492$ | $-8251.34\%$ |
+| **k-UpCCGSD** | **SPSA** | $36.574488$ | $46.852924$ | $0.000632$ | $120.218556$ | $-89255.43\%$ |
+| **k-UpCCGSD** | **QNSPSA** | $3.998492$ | $2.842792$ | $0.000788$ | $7.674996$ | $-9669.75\%$ |
 
 ---
 
-## ⚡ IBM Quantum Physical QPU Evaluation
+## ⚡ Calibrated Quantum Device Simulation & Parameter Binding Analysis
 
-A single-point energy evaluation was executed in **Job Mode** (no sessions) on the least-busy operational IBM Quantum QPU:
+Hardware evaluation is conducted with a genuine calibrated noisy Aer simulation based on `FakeFez` (156-qubit Heron architecture) and parameter-binding transpilation analysis:
 
-| Metric | Physical QPU Execution |
+| Parameter / Metric | Value |
 | :--- | :--- |
-| **Target Backend** | `ibm_fez` (156-qubit Heron / Eagle Architecture) |
-| **Job ID** | `d330j9cve01c738t02j0` |
-| **Ansatz Evaluated** | `DexcG` (Optimal parameter: $\theta = 0.000000$) |
-| **Transpiled 2-Qubit Gates** | **42** ($\le 300$ limit) |
-| **Transpiled Circuit Depth** | **136** |
+| **Noise Model** | `FakeFez` calibrated noise model |
 | **Shots** | 4,096 |
-| **Exact Ground Energy** | **$-639.72428323\text{ Ha}$** |
-| **QPU Measured Energy** | **$-639.64523949\text{ Ha}$** |
-| **Hardware Error** | **$79.0437\text{ mHa}$** (0.012% relative error) |
-| **Status** | `Completed on Physical QPU` |
+| **Ansatz Evaluated** | `UCCSD` ($\boldsymbol{\theta}^* = \mathbf{0}$) |
+| **Exact CASCI Ground Energy** | **$-639.72428323\text{ Ha}$** |
+| **Noisy Aer Measured Energy** | **$-639.72838844\text{ Ha}$** |
+| **Hardware Noise Error** | **$4.1052\text{ mHa}$** |
+| **Historical Job `d330j9cve01c738t02j0`** | `UNVERIFIED - confirm in IBM Quantum dashboard` |
+| **Unbound Transpiled 2Q Gates** | 49 |
+| **Bound ($\boldsymbol{\theta}=\mathbf{0}$) Transpiled 2Q Gates** | **0** (collapses to reference Hartree-Fock state) |
 
 ---
 
-## 📁 Project Structure & Deliverables
+## 📁 Repository Structure & Deliverables
 
 ```
 VQE_QuantumDots/
-├── BN_QuantumDot_VQE_Benchmark.ipynb # Master interactive Jupyter Notebook (executed top-to-bottom)
-├── results.xlsx                      # Multi-sheet Excel workbook with native charts
-├── README.md                         # Comprehensive documentation & findings
-├── generate_notebook.py              # Notebook generation script
-├── run_benchmark.py                  # Standalone headless benchmark script
-├── .env.example                      # IBM Quantum API token template
+├── BN_QuantumDot_VQE_Benchmark.ipynb # Executed interactive Jupyter Notebook
+├── results.xlsx                      # Comprehensive 7-sheet workbook with native charts
+├── README.md                         # Benchmark report and findings
+├── CHANGELOG.md                      # Audit of fixes and improvements
+├── generate_notebook.py              # Notebook builder script
+├── run_benchmark.py                  # Headless benchmark runner
+├── run_live_hardware_job.py          # Real IBM Quantum hardware job launcher
+├── .env.example                      # IBM Quantum token template
 ├── data/
-│   ├── bn_dot_631gdp.json            # 6-31G(d,p) 2-electron integrals & CASCI reference
-│   ├── bn_dot_sto3g.json             # STO-3G 2-electron integrals & CASCI reference
-│   └── benchmark_results_6-31gd_p.json # Cached 64-run benchmark metrics & trajectories
+│   ├── bn_dot_631gdp.json            # 6-31G(d,p) (2e,2o) integrals & CASCI reference
+│   ├── bn_dot_631gdp_4e4o.json       # 6-31G(d,p) (4e,4o) integrals & CASCI reference
+│   ├── bn_dot_631gdp_6e6o.json       # 6-31G(d,p) (6e,6o) integrals & CASCI reference
+│   ├── bn_dot_631gdp_b3lyp.json      # 6-31G(d,p) B3LYP integrals & CASCI reference
+│   ├── bn_dot_sto3g.json             # STO-3G (2e,2o) integrals & CASCI reference
+│   ├── benchmark_results_6-31gd_p.json # Full 64-run benchmark metrics & trajectories
+│   ├── lr_sweep_results.json         # 24-point learning rate tuning sweep data
+│   └── robustness_results.json       # 80-run 5-seed robustness benchmark data
 ├── figures/
 │   ├── circuit_DexcG.png             # Decomposed circuit diagram (DexcG)
 │   ├── circuit_PCU2.png              # Decomposed circuit diagram (PCU2)
 │   ├── circuit_UCCSD.png             # Decomposed circuit diagram (UCCSD)
 │   ├── circuit_k-UpCCGSD.png         # Decomposed circuit diagram (k-UpCCGSD)
 │   └── benchmark_overview.png        # 4-panel overview comparison chart
-└── src/
-    ├── __init__.py
-    ├── config.py                     # IBM Quantum credentials & service loader
-    ├── molecule.py                   # Geometry, Jordan-Wigner mapper, and exact solver
-    ├── ansatze.py                    # 4 Ansatz generators and circuit transpiler
-    ├── optimizers.py                 # GD, ADAM, SPSA, QNSPSA with batched PUBs
-    ├── benchmark.py                  # 64-configuration grid executor
-    ├── hardware.py                   # IBM Quantum EstimatorV2 hardware runner
-    └── excel_export.py               # openpyxl multi-sheet workbook & chart builder
+├── src/
+│   ├── __init__.py
+│   ├── config.py                     # IBM Quantum credentials & service loader
+│   ├── molecule.py                   # Geometry, active spaces, and exact solver
+│   ├── compute_pyscf.py              # PySCF electron integral driver
+│   ├── ansatze.py                    # 4 Ansatz generators and circuit transpiler
+│   ├── optimizers.py                 # Vectorized central finite-difference optimizers
+│   ├── benchmark.py                  # Full 64-run grid executor & sweeps
+│   ├── hardware.py                   # Calibrated FakeFez noisy Aer runner & binding test
+│   └── excel_export.py               # openpyxl 7-sheet workbook & chart exporter
+└── tests/
+    ├── conftest.py
+    ├── run_verification_suite.py     # Verification runner for Excel export
+    ├── test_ansatze.py               # Parameter count and HF reproduction tests
+    ├── test_b3lyp_active_space.py    # DFT orbital active space tests
+    ├── test_conservation.py          # Particle number & Sz conservation tests
+    ├── test_geometry.py              # Molecular geometry and bond length tests
+    ├── test_gradients.py             # Vectorized finite-difference gradient tests
+    ├── test_hamiltonian.py           # Hamiltonian diagonalization tests
+    ├── test_pyscf_reference.py       # PySCF RHF & CASCI reference tests
+    └── test_reproducibility.py       # Deterministic seed reproducibility tests
 ```
 
 ---
 
 ## 📗 Excel Workbook Specification (`results.xlsx`)
 
-The generated `results.xlsx` file contains 5 formatted sheets:
-1. **`Config`**: Geometry, charge, spin, basis sets, active space, and package versions.
-2. **`Results`**: Full 64-configuration table with 3-color conditional formatting on error (Green: $<1\text{ mHa}$, Yellow: $<10\text{ mHa}$, Red: $\ge 10\text{ mHa}$).
-3. **`Convergence`**: Complete 50-iteration energy convergence trajectories for all 64 configurations.
-4. **`Summary`**: Aggregated performance per ansatz and optimizer, featuring 4 native openpyxl charts (Minimum Error Bar Chart, Optimizer Error Comparison, Wall-Clock Runtime, Circuit Transpilation Metrics).
-5. **`Hardware`**: IBM Quantum QPU execution log comparing exact CASCI vs simulator vs QPU energy.
+The generated `results.xlsx` workbook contains **7 formatted sheets** with zero fabricated numbers:
+1. **`Config`**: Metadata, active space definition, software environment versions, and LR sweep results.
+2. **`Results`**: Full 64-configuration table with % correlation recovered, evaluation counts, and 3-color conditional formatting.
+3. **`Convergence`**: Complete 51-point ($t=0 \dots 50$) energy trajectories for all 64 configurations.
+4. **`Summary`**: Best per ansatz, top configurations with multi-tier tie ranking, optimizer overview, circuit metrics, and 4 native Excel charts.
+5. **`Robustness`**: 5-seed random initialization statistics (mean, std, min, max, % correlation).
+6. **`Hardware`**: Calibrated FakeFez noisy Aer simulation (4096 shots) and parameter binding analysis.
+7. **`Verification`**: Automated verification test suite results with PASS/FAIL status.
 
 ---
 
-## 🛠️ Software & Environment Versions
+## 🧪 Verification & Testing
 
-- **Python**: `3.13.12`
-- **Qiskit**: `2.3.1`
-- **Qiskit Nature**: `0.8.0`
-- **Qiskit IBM Runtime**: `0.45.1`
-- **Qiskit Aer**: `0.17.2`
-- **OpenPyXL**: `3.1.5`
-- **NumPy**: `2.4.3`
-- **SciPy**: `1.17.1`
-- **Pandas**: `3.0.1`
-- **Matplotlib**: `3.10.8`
-
----
-
-## 🚀 How to Run
-
-### 1. Configure IBM Quantum Token
-Create `.env` in the root directory:
+Run the automated test suite across all 8 modules (15 unit tests):
 ```bash
-IBMQ_API_KEY=your_ibm_quantum_api_token_here
+pytest -v tests/
 ```
 
-### 2. Run the Jupyter Notebook
-Open `BN_QuantumDot_VQE_Benchmark.ipynb` in VS Code or JupyterLab and execute all cells from top to bottom.
+All 15 tests pass deterministically.
 
-### 3. Run Headless Benchmark
+---
+
+## 🚀 Execution Instructions
+
+### 1. Execute Jupyter Notebook
+```bash
+python generate_notebook.py
+python -m jupyter nbconvert --to notebook --execute --inplace BN_QuantumDot_VQE_Benchmark.ipynb
+```
+
+### 2. Run Headless Benchmark
 ```bash
 python run_benchmark.py
 ```

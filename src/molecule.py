@@ -1,12 +1,18 @@
 """
-Molecular definition, Active Space reduction, and Hamiltonian mapping for BN Quantum Dot (B8N8H10).
+Molecular geometry and active-space electronic Hamiltonian builder for the
+hexagonal Boron-Nitride (B8N8H10) quantum dot using Jordan-Wigner transformation.
 """
 import json
-import numpy as np
+import warnings
 from pathlib import Path
+import numpy as np
+from scipy.sparse import SparseEfficiencyWarning
+
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_nature.second_q.hamiltonians import ElectronicEnergy
 from qiskit_nature.second_q.mappers import JordanWignerMapper
+
+warnings.filterwarnings("ignore", category=SparseEfficiencyWarning)
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
@@ -39,7 +45,12 @@ H -5.86230230 -3.98673035 0.0
 H -1.30886684 -4.11682851 0.0
 """.strip()
 
-def load_or_build_bn_dot_hamiltonian(basis="6-31g(d,p)"):
+def load_or_build_bn_dot_hamiltonian(
+    basis: str = "6-31g(d,p)",
+    n_active_electrons: int = 2,
+    n_active_orbitals: int = 2,
+    orbital_method: str = "rhf"
+) -> tuple[SparsePauliOp, float, dict]:
     """
     Loads active-space integrals for BN Quantum Dot and builds the Qiskit Pauli Hamiltonian.
     
@@ -49,16 +60,29 @@ def load_or_build_bn_dot_hamiltonian(basis="6-31g(d,p)"):
         meta (dict): Dictionary with molecule metadata (electrons, active space, etc.)
     """
     clean_basis = "631gdp" if "6-31g" in basis.lower() else "sto3g"
-    cache_path = DATA_DIR / f"bn_dot_{clean_basis}.json"
+    
+    if orbital_method.lower() == "b3lyp":
+        cache_filename = f"bn_dot_{clean_basis}_b3lyp.json"
+    elif (n_active_electrons, n_active_orbitals) == (4, 4):
+        cache_filename = f"bn_dot_{clean_basis}_4e4o.json"
+    elif (n_active_electrons, n_active_orbitals) == (6, 6):
+        cache_filename = f"bn_dot_{clean_basis}_6e6o.json"
+    else:
+        cache_filename = f"bn_dot_{clean_basis}.json"
+
+    cache_path = DATA_DIR / cache_filename
 
     if not cache_path.exists():
-        raise FileNotFoundError(f"Active space cache file not found at {cache_path}.")
+        raise FileNotFoundError(
+            f"Active space cache file not found at {cache_path}. "
+            f"Run 'wsl python3 src/compute_pyscf.py' to generate active space data."
+        )
 
-    with open(cache_path, "r") as f:
+    with open(cache_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     h1 = np.array(data["h1_active"])
-    h2 = np.array(data["h2_active"]) # Chemist notation (p,q,r,s)
+    h2 = np.array(data["h2_active"])
     
     # Convert to Physicist notation <pr|qs> = (pq|rs) -> np.einsum('pqrs->prqs', h2)
     h2_phys = np.einsum("pqrs->prqs", h2)
@@ -70,10 +94,11 @@ def load_or_build_bn_dot_hamiltonian(basis="6-31g(d,p)"):
     
     # Exact diagonalization of active space Hamiltonian
     mat = active_qubit_op.to_matrix()
-    evals, evecs = np.linalg.eigh(mat)
+    evals, _ = np.linalg.eigh(mat)
     active_ground_energy = float(evals[0])
     
     casci_energy = float(data["casci_energy"])
+    hf_energy = float(data["hf_energy"])
     energy_shift = casci_energy - active_ground_energy
     
     # Add identity term shift to qubit Hamiltonian
@@ -81,21 +106,33 @@ def load_or_build_bn_dot_hamiltonian(basis="6-31g(d,p)"):
     id_op = SparsePauliOp(["I" * num_qubits], [energy_shift])
     full_qubit_hamiltonian = (active_qubit_op + id_op).simplify()
     
+    e_corr_mHa = abs(hf_energy - casci_energy) * 1000.0
+    if e_corr_mHa < 1.0:
+        warnings.warn(
+            f"Active space ({n_active_electrons}e, {n_active_orbitals}o) has small correlation energy "
+            f"E_corr = {e_corr_mHa:.4f} mHa (< 1.0 mHa). Zero-initialization starts within {e_corr_mHa:.4f} mHa "
+            f"of exact reference.",
+            UserWarning
+        )
+    
     meta = {
         "molecule": data["molecule"],
         "label": data["label"],
         "basis": data["basis"],
+        "orbital_method": data.get("orbital_method", orbital_method),
         "n_atoms": data["n_atoms"],
         "n_electrons": data["n_electrons"],
         "n_active_electrons": data["n_active_electrons"],
         "n_active_orbitals": data["n_active_orbitals"],
         "num_qubits": num_qubits,
         "num_pauli_terms": len(full_qubit_hamiltonian),
-        "hf_energy": data["hf_energy"],
+        "hf_energy": hf_energy,
         "casci_energy": casci_energy,
         "active_ground_energy": active_ground_energy,
         "energy_shift": energy_shift,
-        "exact_ground_energy": casci_energy
+        "exact_ground_energy": casci_energy,
+        "correlation_energy_mHa": e_corr_mHa,
+        "dft_total_energy": data.get("dft_total_energy")
     }
     
     return full_qubit_hamiltonian, casci_energy, meta
@@ -103,5 +140,4 @@ def load_or_build_bn_dot_hamiltonian(basis="6-31g(d,p)"):
 if __name__ == "__main__":
     for b in ["sto-3g", "6-31g(d,p)"]:
         H, E_exact, meta = load_or_build_bn_dot_hamiltonian(basis=b)
-        print(f"[{meta['label']} - {b}] Qubits: {meta['num_qubits']}, Pauli terms: {meta['num_pauli_terms']}, Exact Energy: {E_exact:.8f} Ha")
-
+        print(f"[{meta['label']} - {b}] Qubits: {meta['num_qubits']}, Pauli terms: {meta['num_pauli_terms']}, Exact Energy: {E_exact:.8f} Ha, E_corr: {meta['correlation_energy_mHa']:.4f} mHa")

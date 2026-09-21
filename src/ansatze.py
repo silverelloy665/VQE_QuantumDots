@@ -1,18 +1,22 @@
 """
 Ansatz definitions, circuit gallery generator, and transpilation analysis for BN Quantum Dot.
 """
+import warnings
 from pathlib import Path
 from collections import OrderedDict
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
+from scipy.sparse import SparseEfficiencyWarning
 
 from qiskit.circuit import QuantumCircuit, ParameterVector
 from qiskit_nature.second_q.circuit.library import HartreeFock, UCC
 from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit.providers.fake_provider import GenericBackendV2
+
+warnings.filterwarnings("ignore", category=SparseEfficiencyWarning)
 
 FIGURES_DIR = Path(__file__).resolve().parent.parent / "figures"
 FIGURES_DIR.mkdir(parents=True, exist_ok=True)
@@ -26,10 +30,15 @@ def build_particle_conserving_u2(
     """
     Constructs the hand-built ParticleConservingU2 (PCU2) ansatz:
     - Hartree-Fock initial state
+    - Hartree-Fock initial state (|0101>)
     - For each layer (reps):
         - RZ rotation on every qubit
         - Even-pair entanglers on (0,1), (2,3), ... : CNOT - CRX - CNOT
         - Odd-pair entanglers on (1,2), (3,4), ...  : CNOT - CRX - CNOT
+        - RZ rotation on every qubit (4 params)
+        - Even-pair entanglers on (0,1), (2,3): CNOT - CRX - CNOT (2 params)
+        - Odd-pair entanglers on (1,2): CNOT - CRX - CNOT (1 param)
+    Total parameters per rep = 4 + 2 + 1 = 7. For reps=2, total parameters = 14.
     """
     mapper = qubit_mapper or JordanWignerMapper()
     num_qubits = num_spatial_orbitals * 2
@@ -82,6 +91,11 @@ def get_ansatz_dict(
     - PCU2: ParticleConservingU2 (2 reps)
     - UCCSD: UCC with excitations='sd'
     - k-UpCCGSD: UCC with excitations='sd', generalized=True, reps=k (k=3)
+    - DexcG: UCC with excitations='d' (1 parameter for 2e/2o)
+    - PCU2: ParticleConservingU2 (reps=2, 14 parameters for 2e/2o)
+    - UCCSD: UCC with excitations='sd' (3 parameters for 2e/2o)
+    - k-UpCCGSD: Generalized UCC with excitations='sd', generalized=True, reps=k (k=3, 9 parameters for 2e/2o).
+      Note: This is a generalized unitary coupled cluster ansatz with k repetitions and is not pair-restricted.
     """
     mapper = JordanWignerMapper()
     hf_state = HartreeFock(num_spatial_orbitals, num_particles, mapper)
@@ -146,10 +160,12 @@ def analyze_and_render_circuits(
         backend = GenericBackendV2(num_qubits=5)
         
     pm = generate_preset_pass_manager(backend=backend, optimization_level=2)
+    pm = generate_preset_pass_manager(backend=backend, optimization_level=3)
     records = []
     
     for name, qc in ansatze_dict.items():
         # Decompose 2-3 levels so elementary gates (CNOT, RZ, RX, etc.) are visible
+        # Decompose 2 levels so elementary gates (CNOT, RZ, RX, etc.) are visible
         decomposed = qc.decompose()
         if any(op.name in ["PauliEvolution", "HartreeFock"] for op in decomposed.data):
             decomposed = decomposed.decompose()
@@ -166,6 +182,7 @@ def analyze_and_render_circuits(
             plt.close(fig)
             
         # Transpilation analysis
+        # Transpilation analysis (unbound symbolic parameters)
         transpiled = pm.run(decomposed)
         t_ops = transpiled.count_ops()
         t_2q_gates = sum(count for op, count in t_ops.items() if op in ["cx", "ecr", "cz"])
