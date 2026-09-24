@@ -229,7 +229,9 @@ def run_6e6o_benchmark(force: bool = False, exhaustive: bool = False):
                         "Rel_Error_Pct": (abs(final_e - exact_energy) / abs(exact_energy)) * 100.0,
                         "Total_Evaluations": res["total_evaluations"],
                         "Wall_Time_s": wtime,
-                        "Iterations": iters
+                        "Iterations": iters,
+                        "Final_Params": res.get("final_params", []),
+                        "Best_Params": res.get("best_params", [])
                     })
 
                     cfg_label = f"{a_name}_{i_name}_{o_name}"
@@ -328,20 +330,27 @@ def update_results_workbook():
     if p_hw.exists():
         with open(p_hw, "r", encoding="utf-8") as f:
             hw_record = json.load(f)
+        ls_res = hw_record.get("landscape_results", [])
+        best_pt = min(ls_res, key=lambda x: x.get("measured_energy_ha", float("inf"))) if ls_res else {}
+        meas_e = hw_record.get("measured_energy_ha", best_pt.get("measured_energy_ha"))
+        err_mha = hw_record.get("error_mha", best_pt.get("error_mha"))
+        job_id = hw_record.get("job_id", "")
+        print(f"  -> Traceability: source: data/hardware_run.json, produced by: scripts/run_live_hardware_job.py, job_id: {job_id}")
         hw_data_for_sheet = {
             "Status": f"Evaluated on Physical IBM Quantum QPU ({hw_record.get('backend')})",
             "Target Backend": hw_record.get("backend", "ibm_fez"),
-            "Job ID": hw_record.get("job_id"),
+            "Job ID": job_id,
             "Ansatz Selected": f"{hw_record.get('ansatz', 'DexcG')} (theta sweep [-0.10, +0.10])",
             "Parameters Optimized": 1,
             "Transpiled 2-Qubit Gate Count": hw_record.get("transpiled_2q_gates", 42),
             "Circuit Depth": hw_record.get("transpiled_depth", 144),
             "Exact Active Ground Energy (Ha)": meta_2["casci_energy"],
-            "Measured Energy (Ha)": hw_record.get("measured_energy_ha"),
-            "Energy Error (mHa)": hw_record.get("error_mha"),
+            "Measured Energy (Ha)": meas_e,
+            "Energy Error (mHa)": err_mha,
             "Shots": hw_record.get("shots", 4096),
             "QPU Runtime (seconds)": hw_record.get("qpu_seconds"),
-            "Direct Job Dashboard": f"https://quantum.ibm.com/jobs/{hw_record.get('job_id')}"
+            "Direct Job Dashboard": f"https://quantum.ibm.com/jobs/{job_id}",
+            "landscape_results": ls_res
         }
 
     # 9. Parameter Binding Test

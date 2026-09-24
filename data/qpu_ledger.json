@@ -1,7 +1,7 @@
 {
   "budget_limit_seconds": 600.0,
-  "total_consumed_seconds": 50.35,
-  "remaining_seconds": 549.65,
+  "total_consumed_seconds": 100.35,
+  "remaining_seconds": 499.65,
   "runs": [
     {
       "timestamp": "2026-09-24T15:58:59.507184+00:00",
@@ -21,6 +21,16 @@
       "qpu_seconds": 20.0,
       "shots": 4096,
       "ansatz": "DexcG",
+      "notes": "5-point landscape PUB verification"
+    },
+    {
+      "timestamp": "2026-09-24T21:40:23.828634+00:00",
+      "backend": "ibm_fez",
+      "job_id": "daqph1uekp0c73ar40l0",
+      "status": "COMPLETED",
+      "qpu_seconds": 50.0,
+      "shots": 4096,
+      "ansatz": "PCU2",
       "notes": "5-point landscape PUB verification"
     }
   ]

@@ -177,11 +177,8 @@ def export_benchmark_to_excel(
     autofit_column_widths(ws_cfg)
     
     # -------------------------------------------------------------
-    # Sheet 2: Results (64 configurations)
     # Sheet 2: Results (2e, 2o)
     # -------------------------------------------------------------
-    ws_res = wb.create_sheet(title="Results")
-    ws_res.views.sheetView[0].showGridLines = True
     ws_res = wb.create_sheet(title="Results (2e, 2o)")
     _populate_results_sheet(ws_res, results_df)
 
@@ -207,52 +204,6 @@ def export_benchmark_to_excel(
         for _, s_row in scaling_df.iterrows():
             ws_scale.append(list(s_row.values))
         autofit_column_widths(ws_scale)
-    
-    res_headers = [
-        "Config ID", "Ansatz", "Initialization", "Optimizer", "Parameters",
-        "Final Energy (Ha)", "Best Energy (Ha)", "Exact Energy (Ha)", "Error (mHa)",
-        "Rel Error (%)", "% Correlation Recovered", "Total Evaluations", "Wall Time (s)", "Iterations"
-    ]
-    ws_res.append(res_headers)
-    style_header_row(ws_res, 1, len(res_headers))
-    
-    for _, row in results_df.iterrows():
-        ws_res.append([
-            int(row["Config_ID"]),
-            str(row["Ansatz"]),
-            str(row["Initialization"]),
-            str(row["Optimizer"]),
-            int(row["Parameters"]),
-            float(row["Final_Energy_Ha"]),
-            float(row.get("Best_Energy_Ha", row["Final_Energy_Ha"])),
-            float(row["Exact_Energy_Ha"]),
-            float(row["Error_mHa"]),
-            float(row["Rel_Error_Pct"]),
-            float(row.get("Pct_Corr_Recovered", 0.0)),
-            int(row.get("Total_Evaluations", 0)),
-            float(row["Wall_Time_s"]),
-            int(row["Iterations"])
-        ])
-        
-    # Number formatting
-    for row in ws_res.iter_rows(min_row=2, max_row=len(results_df) + 1, min_col=1, max_col=len(res_headers)):
-        row[5].number_format = "0.00000000"
-        row[6].number_format = "0.00000000"
-        row[7].number_format = "0.00000000"
-        row[8].number_format = "0.0000"
-        row[9].number_format = "0.000000%"
-        row[10].number_format = "0.00%"
-        row[11].number_format = "#,##0"
-        row[12].number_format = "0.000"
-        
-    # Color scale conditional formatting on Error (mHa) (Column I)
-    rule = ColorScaleRule(
-        start_type="min", start_color="63BE7B", # Green
-        mid_type="percentile", mid_value=50, mid_color="FFEB84", # Yellow
-        end_type="max", end_color="F8696B" # Red
-    )
-    ws_res.conditional_formatting.add(f"I2:I{len(results_df)+1}", rule)
-    autofit_column_widths(ws_res)
     
     # -------------------------------------------------------------
     # Sheet 3: Convergence (51 points x 64 columns)
@@ -479,37 +430,49 @@ def export_benchmark_to_excel(
         "Hardware Policy": "No fabricated offsets or fallback mock values"
     }
     
-    landscape_table = None
+    landscape_table = hw_rows.get("landscape_results")
     for k, v in hw_rows.items():
-        ws_hw.append([k, v])
         if k == "landscape_results":
-            landscape_table = v
+            continue
+        if v is None:
             continue
         if isinstance(v, (list, tuple)):
-            v = ", ".join(str(x) for x in v)
+            v_str = ", ".join(str(x) for x in v)
         elif isinstance(v, dict):
             import json as _json
-            v = _json.dumps(v)
-        ws_hw.append([str(k), v])
+            v_str = _json.dumps(v)
+        elif isinstance(v, float):
+            v_str = f"{v:.8f}" if abs(v) > 10 else f"{v:.4f}"
+        else:
+            v_str = v
+        ws_hw.append([str(k), v_str])
         
     if landscape_table:
         ws_hw.append([])
         start_t = ws_hw.max_row + 1
         ws_hw.cell(row=start_t, column=1, value="Physical QPU 5-Point Parameterized Energy Landscape")
         ws_hw.cell(row=start_t, column=1).font = Font(name="Calibri", size=13, bold=True, color="000000")
-        ws_hw.merge_cells(start_row=start_t, start_column=1, end_row=start_t, end_column=3)
-        ws_hw.append(["Theta (rad)", "Measured Energy (Ha)", "Error (mHa)"])
-        style_header_row(ws_hw, ws_hw.max_row, 3)
+        ws_hw.merge_cells(start_row=start_t, start_column=1, end_row=start_t, end_column=4)
+        headers = ["Theta (rad)", "Measured Energy (Ha)", "Error (mHa)", "Std Dev / Error Bar (Ha)"]
+        ws_hw.append(headers)
+        style_header_row(ws_hw, ws_hw.max_row, len(headers))
         for pt in landscape_table:
+            std_val = pt.get("std_dev_ha", pt.get("std_dev"))
+            std_str = "N/A (no shot-noise std recorded)" if std_val is None else f"{float(std_val):.8f}"
             ws_hw.append([
                 float(pt.get("theta", 0.0)),
                 float(pt.get("measured_energy_ha", 0.0)),
-                float(pt.get("error_mha", 0.0))
+                float(pt.get("error_mha", 0.0)),
+                std_str
             ])
+            curr_row = ws_hw.max_row
+            ws_hw.cell(row=curr_row, column=1).number_format = "0.000"
+            ws_hw.cell(row=curr_row, column=2).number_format = "0.00000000"
+            ws_hw.cell(row=curr_row, column=3).number_format = "0.0000"
         
     if binding_test_data:
         ws_hw.append([])
-        ws_hw.append(["Parameter Binding Transpilation Analysis at θ = 0", ""])
+        ws_hw.append(["Parameter Binding Transpilation Analysis at theta = 0", ""])
         ws_hw.append(["Metric", "Value"])
         style_header_row(ws_hw, ws_hw.max_row, 2)
         for bk, bv in binding_test_data.items():
