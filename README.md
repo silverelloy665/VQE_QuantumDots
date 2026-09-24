@@ -24,8 +24,43 @@ This repository benchmarks across a full factorial grid:
 | **6-31G(d,p) $(4e, 4o)$** (Scaled) | $-639.72424230\text{ Ha}$ | **$-639.72453605\text{ Ha}$** | $0.29375\text{ mHa}$ |
 | **6-31G(d,p) $(6e, 6o)$** (Scaled) | $-639.72424230\text{ Ha}$ | **$-639.72562598\text{ Ha}$** | $1.38368\text{ mHa}$ |
 | **6-31G(d,p) B3LYP $(2e, 2o)$** | $-639.72424230\text{ Ha}$ | **$-639.72428323\text{ Ha}$** | $0.04093\text{ mHa}$ |
+| Basis Set / Active Space | Reference Determinant (Ha) | Exact Active CASCI (Ha) | Active Correlation Energy $E_{\text{corr}}$ | Chemical Accuracy Threshold |
+| :--- | :--- | :--- | :--- | :--- |
+| **STO-3G $(2e, 2o)$** (Smoke Test) | $-631.74167448\text{ Ha}$ | **$-631.74178346\text{ Ha}$** | $0.10897\text{ mHa}$ | $1.6000\text{ mHa}$ (BELOW) |
+| **6-31G(d,p) $(2e, 2o)$** (Production) | $-639.72424230\text{ Ha}$ | **$-639.72428323\text{ Ha}$** | $0.04093\text{ mHa}$ | $1.6000\text{ mHa}$ (BELOW) |
+| **6-31G(d,p) $(4e, 4o)$** (Scaled) | $-639.72424230\text{ Ha}$ | **$-639.72453605\text{ Ha}$** | $0.29375\text{ mHa}$ | $1.6000\text{ mHa}$ (BELOW) |
+| **6-31G(d,p) $(6e, 6o)$** (Scaled) | $-639.72424230\text{ Ha}$ | **$-639.72562598\text{ Ha}$** | $1.38368\text{ mHa}$ | $1.6000\text{ mHa}$ (BELOW) |
+| **6-31G(d,p) B3LYP $(2e, 2o)$** | $-639.63711823\text{ Ha}$ | **$-639.63815054\text{ Ha}$** | $1.03231\text{ mHa}$ | $1.6000\text{ mHa}$ (BELOW) |
 
 > **Note on Active Space Correlation**: In the $(2e, 2o)$ frontier active space, the Hartree-Fock state $|0101\rangle$ is already within $0.041\text{ mHa}$ of the exact ground state due to the strong closed-shell ionic bonding of BN quantum dots. Multi-orbital active space scaling shows that $E_{\text{corr}}$ grows systematically from $0.041\text{ mHa} \to 0.294\text{ mHa} \to 1.384\text{ mHa}$ as $(4e, 4o)$ and $(6e, 6o)$ active spaces incorporate dynamic correlation.
+> [!WARNING]
+> **CRITICAL SCIENTIFIC INSIGHT: NEAR-HARTREE-FOCK ACTIVE SPACES**
+> In ALL five evaluated active-space configurations (including the 12-qubit $6e, 6o$ active space), the active-space correlation energy $E_{\text{corr}} = |E_{\text{ref}} - E_{\text{CASCI}}| \le 1.384\text{ mHa}$ is **strictly below chemical accuracy ($1.6000\text{ mHa} \approx 1\text{ kcal/mol}$)**.
+> Because the mean-field Hartree-Fock reference determinant $|0101\rangle$ is already within $0.041\text{ mHa}$ of the exact ground state, the fact that "zero-initialization ($\boldsymbol{\theta}=\mathbf{0}$) wins" is largely an artifact of initializing inside the chemical accuracy basin. Non-zero initializations ($\boldsymbol{\theta}_0 = 0.5, 1.0, \mathcal{U}(0,1)$) artificially displace the system into excited-state topologies and barren plateaus. The benchmark therefore tests convergence from perturbed states rather than discriminating intrinsic ansatz expressibility for strongly correlated molecules.
+>
+> *(Note on B3LYP: The active space in B3LYP Kohn-Sham orbitals has reference determinant energy $-639.63711823\text{ Ha}$ and CASCI ground state $-639.63815054\text{ Ha}$ ($E_{\text{corr}} = 1.03231\text{ mHa}$). The full B3LYP DFT total electronic energy is $-643.63393574\text{ Ha}$ and is strictly distinct.)*
+
+---
+
+## 📈 Qubit and Parameter Scaling: Full Molecule vs. Active Spaces
+
+The full $B_8N_8H_{10}$ molecule possesses 106 electrons ($o = 53$ occupied spatial orbitals). Under the Jordan-Wigner transformation, each spatial orbital maps to two spin-orbital qubits ($N_Q = 2 N_{\text{spatial}}$). For closed-shell singlet ground states with spin-conserving excitations ($\alpha \to \alpha, \beta \to \beta$):
+- **Singles Count**: $N_S = 2 \cdot o \cdot v$
+- **Doubles Count**: $N_D = 2 \binom{o}{2}\binom{v}{2} + (o \cdot v)^2$
+
+| System / Configuration | Category | Spatial Orbitals | JW Qubits | UCCSD Singles | UCCSD Doubles | Total UCCSD Params | Feasibility |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
+| **Full Molecule (STO-3G)** | Full Molecule | 90 | **180** | 3,922 | 5,681,017 | **5,684,939** | Infeasible (180 Qubits, 5.7M Params) |
+| **Full Molecule (6-31G(d,p))** | Full Molecule | 274 | **548** | 23,426 | 204,192,729 | **204,216,155** | Infeasible (548 Qubits, 204.2M Params) |
+| **Active Space $(2e, 2o)$** | Benchmark (Core) | 2 | **4** | 2 | 1 | **3** | Ideal for NISQ & Verification |
+| **Active Space $(4e, 4o)$** | Extended Active Space | 4 | **8** | 8 | 18 | **26** | Exact Statevector Simulator |
+| **Active Space $(6e, 6o)$** | Extended Active Space | 6 | **12** | 18 | 99 | **117** | Statevector / Runtime Constrained |
+
+> [!NOTE]
+> **Basis-Invariance of the UCCSD Circuit**:
+> The UCCSD circuit structure for a specified $(n_e, n_o)$ active space is **completely invariant to the AO basis set**:
+> - An active space of $(2e, 2o)$ produces an identical 4-qubit, 3-parameter circuit whether evaluated in STO-3G or 6-31G(d,p).
+> - Basis set changes only alter the 1-electron and 2-electron molecular orbital integrals ($h_{pq}, h_{pqrs}$), and hence the Pauli coefficients of the mapped Hamiltonian $\hat{H}$, leaving circuit topology, transpiled depth, and gate count unchanged.
 
 ---
 
@@ -134,6 +169,7 @@ Evaluated across seeds $[42, 123, 456, 789, 1000]$:
 ## ⚡ IBM Quantum Physical QPU Evaluation (`ibm_fez`)
 
 A live single-point energy evaluation was executed on the physical IBM Quantum QPU `ibm_fez` (156-qubit Heron architecture) in **Job Mode** using Qiskit Runtime `EstimatorV2`:
+A live 5-point parameterized energy landscape evaluation was submitted and executed on the physical IBM Quantum QPU `ibm_fez` (156-qubit Heron architecture) in **Job Mode** using Qiskit Runtime `EstimatorV2`.
 
 | Parameter / Metric | Live Physical QPU Value |
 | :--- | :--- |
@@ -150,6 +186,34 @@ A live single-point energy evaluation was executed on the physical IBM Quantum Q
 | **Physical QPU Measured Energy** | **$-639.72364609\text{ Ha}$** |
 | **Physical Hardware Error** | **$0.6371\text{ mHa}$** (0.0001% relative error) |
 | **Hardware Execution Record** | Cached in `data/hardware_run.json` |
+To avoid trivial parameter cancellation at $\boldsymbol{\theta}=\mathbf{0}$ (where optimization level 3 collapses the circuit to depth 1 and 0 two-qubit gates), a 5-point Primitive Unified Block (PUB) was submitted with parameterized DexcG:
+$$\theta \in [-0.10, -0.05, 0.00, +0.05, +0.10]\text{ radians}$$
+
+### Live Physical Hardware Execution Record
+- **Target Backend**: `ibm_fez` (156-qubit Heron Architecture, revision 2)
+- **Job ID**: [`daqkle3t55cs738rsfrg`](https://quantum.ibm.com/jobs/daqkle3t55cs738rsfrg)
+- **Status**: `COMPLETED_ON_PHYSICAL_QPU`
+- **Ansatz Evaluated**: `DexcG` (1 parameter, 5 landscape points in a single PUB)
+- **Transpiled Circuit Depth**: **144**
+- **Transpiled 2-Qubit Gates**: **42** (CZ entangling gates on physical coupling map)
+- **Total Gates**: 181 (71 RZ, 68 SX, 42 CZ)
+- **Shots**: 4,096 per parameter point
+- **Elapsed Wait Time**: $77.18\text{ s}$ (20.0s QPU time billed to ledger)
+- **Budget Ledger**: Tracked in `data/qpu_ledger.json` ($50.35\text{ s}$ consumed of $600.0\text{ s}$ limit, $549.65\text{ s}$ remaining)
+
+| $\theta$ (rad) | Measured Physical Energy (Ha) | Exact CASCI Reference (Ha) | Physical QPU Error (mHa) | Rel Error (%) |
+| :---: | :---: | :---: | :---: | :---: |
+| **$-0.10$** | $-639.58606039$ | $-639.72428323$ | $138.22\text{ mHa}$ | $0.0216\%$ |
+| **$-0.05$** | $-639.59354271$ | $-639.72428323$ | $130.74\text{ mHa}$ | $0.0204\%$ |
+| **$0.00$** | **$-639.59675784$** | **$-639.72428323$** | **$127.53\text{ mHa}$** | **$0.0199\%$** |
+| **$+0.05$** | **$-639.59691169$** | **$-639.72428323$** | **$127.37\text{ mHa}$** | **$0.0199\%$** |
+| **$+0.10$** | $-639.58595898$ | $-639.72428323$ | $138.32\text{ mHa}$ | $0.0216\%$ |
+
+> [!NOTE]
+> **Physical Energy Landscape Verification**:
+> The physical Heron QPU reproduces the expected variational energy minimum at $\theta \approx 0.00 - 0.05\text{ rad}$. The unmitigated physical hardware noise shifts the landscape upward by $\sim 127\text{ mHa}$ across 42 entangling CZ gates ($\sim 3\text{ mHa}$ error per CZ gate), completely validating genuine quantum circuit execution without trivial state collapse.
+
+*(Historical reference: Job [`daor3p5r85ps73ffmvn0`](https://quantum.ibm.com/jobs/daor3p5r85ps73ffmvn0) evaluated UCCSD at $\boldsymbol{\theta}=\mathbf{0}$, collapsing to depth 1 and 0 2Q gates with energy $-639.72364609\text{ Ha}$ and error $0.6371\text{ mHa}$.)*
 
 ---
 

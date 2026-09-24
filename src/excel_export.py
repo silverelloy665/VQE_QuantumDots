@@ -47,6 +47,50 @@ def autofit_column_widths(ws, max_len_cap: int = 40):
                 max_len = len(val_str)
         ws.column_dimensions[col_letter].width = min(max(max_len + 3, 12), max_len_cap)
 
+def _populate_results_sheet(ws, df: pd.DataFrame):
+    """Fills a worksheet with standardized, styled benchmark results."""
+    ws.views.sheetView[0].showGridLines = True
+    res_headers = [
+        "Config ID", "Ansatz", "Initialization", "Optimizer", "Parameters",
+        "Final Energy (Ha)", "Best Energy (Ha)", "Exact Energy (Ha)", "Error (mHa)",
+        "Rel Error (%)", "% Correlation Recovered", "Total Evaluations", "Wall Time (s)", "Iterations"
+    ]
+    ws.append(res_headers)
+    style_header_row(ws, 1, len(res_headers))
+    for _, row in df.iterrows():
+        ws.append([
+            int(row["Config_ID"]),
+            str(row["Ansatz"]),
+            str(row["Initialization"]),
+            str(row["Optimizer"]),
+            int(row["Parameters"]),
+            float(row["Final_Energy_Ha"]),
+            float(row.get("Best_Energy_Ha", row["Final_Energy_Ha"])),
+            float(row["Exact_Energy_Ha"]),
+            float(row["Error_mHa"]),
+            float(row["Rel_Error_Pct"]),
+            float(row.get("Pct_Corr_Recovered", 0.0)),
+            int(row.get("Total_Evaluations", 0)),
+            float(row["Wall_Time_s"]),
+            int(row["Iterations"])
+        ])
+    for row in ws.iter_rows(min_row=2, max_row=len(df) + 1, min_col=1, max_col=len(res_headers)):
+        row[5].number_format = "0.00000000"
+        row[6].number_format = "0.00000000"
+        row[7].number_format = "0.00000000"
+        row[8].number_format = "0.0000"
+        row[9].number_format = "0.000000%"
+        row[10].number_format = "0.00%"
+        row[11].number_format = "#,##0"
+        row[12].number_format = "0.000"
+    rule = ColorScaleRule(
+        start_type="min", start_color="63BE7B",
+        mid_type="percentile", mid_value=50, mid_color="FFEB84",
+        end_type="max", end_color="F8696B"
+    )
+    ws.conditional_formatting.add(f"I2:I{len(df)+1}", rule)
+    autofit_column_widths(ws)
+
 def export_benchmark_to_excel(
     results_df: pd.DataFrame,
     convergence_df: pd.DataFrame,
@@ -57,10 +101,14 @@ def export_benchmark_to_excel(
     hardware_data: dict | None = None,
     binding_test_data: dict | None = None,
     verification_df: pd.DataFrame | None = None,
+    results_4e4o_df: pd.DataFrame | None = None,
+    results_6e6o_df: pd.DataFrame | None = None,
+    scaling_df: pd.DataFrame | None = None,
     output_path: str = "results.xlsx"
 ) -> str:
     """
     Generates the comprehensive results.xlsx workbook with 7 sheets and native charts.
+    Generates the comprehensive results.xlsx workbook with multi-active-space sheets and native charts.
     """
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
@@ -130,9 +178,35 @@ def export_benchmark_to_excel(
     
     # -------------------------------------------------------------
     # Sheet 2: Results (64 configurations)
+    # Sheet 2: Results (2e, 2o)
     # -------------------------------------------------------------
     ws_res = wb.create_sheet(title="Results")
     ws_res.views.sheetView[0].showGridLines = True
+    ws_res = wb.create_sheet(title="Results (2e, 2o)")
+    _populate_results_sheet(ws_res, results_df)
+
+    # Sheet: Results (4e, 4o) if available
+    if results_4e4o_df is not None and not results_4e4o_df.empty:
+        ws_4 = wb.create_sheet(title="Results (4e, 4o)")
+        _populate_results_sheet(ws_4, results_4e4o_df)
+
+    # Sheet: Results (6e, 6o) if available
+    if results_6e6o_df is not None and not results_6e6o_df.empty:
+        ws_6 = wb.create_sheet(title="Results (6e, 6o)")
+        _populate_results_sheet(ws_6, results_6e6o_df)
+
+    # Sheet: Active Space Scaling
+    if scaling_df is not None and not scaling_df.empty:
+        ws_scale = wb.create_sheet(title="Active Space Scaling")
+        ws_scale.views.sheetView[0].showGridLines = True
+        ws_scale.append(["Analytical Qubit & UCCSD Parameter Scaling (Jordan-Wigner)"] + [""] * (len(scaling_df.columns) - 1))
+        ws_scale.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(scaling_df.columns))
+        ws_scale["A1"].font = Font(name="Calibri", size=13, bold=True, color="000000")
+        ws_scale.append(list(scaling_df.columns))
+        style_header_row(ws_scale, 2, len(scaling_df.columns))
+        for _, s_row in scaling_df.iterrows():
+            ws_scale.append(list(s_row.values))
+        autofit_column_widths(ws_scale)
     
     res_headers = [
         "Config ID", "Ansatz", "Initialization", "Optimizer", "Parameters",
@@ -405,8 +479,33 @@ def export_benchmark_to_excel(
         "Hardware Policy": "No fabricated offsets or fallback mock values"
     }
     
+    landscape_table = None
     for k, v in hw_rows.items():
         ws_hw.append([k, v])
+        if k == "landscape_results":
+            landscape_table = v
+            continue
+        if isinstance(v, (list, tuple)):
+            v = ", ".join(str(x) for x in v)
+        elif isinstance(v, dict):
+            import json as _json
+            v = _json.dumps(v)
+        ws_hw.append([str(k), v])
+        
+    if landscape_table:
+        ws_hw.append([])
+        start_t = ws_hw.max_row + 1
+        ws_hw.cell(row=start_t, column=1, value="Physical QPU 5-Point Parameterized Energy Landscape")
+        ws_hw.cell(row=start_t, column=1).font = Font(name="Calibri", size=13, bold=True, color="000000")
+        ws_hw.merge_cells(start_row=start_t, start_column=1, end_row=start_t, end_column=3)
+        ws_hw.append(["Theta (rad)", "Measured Energy (Ha)", "Error (mHa)"])
+        style_header_row(ws_hw, ws_hw.max_row, 3)
+        for pt in landscape_table:
+            ws_hw.append([
+                float(pt.get("theta", 0.0)),
+                float(pt.get("measured_energy_ha", 0.0)),
+                float(pt.get("error_mha", 0.0))
+            ])
         
     if binding_test_data:
         ws_hw.append([])

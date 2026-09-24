@@ -99,8 +99,9 @@ def run_robustness_benchmark(
         return pd.DataFrame(data)
         
     hamiltonian, exact_energy, meta = load_or_build_bn_dot_hamiltonian(basis=basis)
-    hf_energy = meta["hf_energy"]
-    delta_corr = abs(hf_energy - exact_energy)
+    ref_det_energy = meta.get("reference_determinant_energy", meta["hf_energy"])
+    delta_corr = abs(ref_det_energy - exact_energy)
+    
     ansatze = get_ansatz_dict()
     estimator = StatevectorEstimator()
     sampler = StatevectorSampler()
@@ -127,7 +128,7 @@ def run_robustness_benchmark(
                     seed=s
                 )
                 err = abs(res["final_energy"] - exact_energy) * 1000.0
-                pct = ((hf_energy - res["final_energy"]) / delta_corr) * 100.0 if delta_corr > 1e-12 else 100.0
+                pct = ((ref_det_energy - res["final_energy"]) / delta_corr) * 100.0 if delta_corr > 1e-12 else 100.0
                 errors.append(err)
                 pct_corrs.append(pct)
                 
@@ -151,6 +152,9 @@ def run_robustness_benchmark(
 
 def run_full_vqe_benchmark(
     basis: str = "6-31g(d,p)",
+    n_active_electrons: int = 2,
+    n_active_orbitals: int = 2,
+    orbital_method: str = "rhf",
     maxiter: int = 50,
     seed: int = 42,
     verbose: bool = True,
@@ -160,12 +164,25 @@ def run_full_vqe_benchmark(
     Executes the full 64-run VQE benchmark grid: 4 ansätze x 4 inits x 4 optimizers.
     Calculates % correlation recovered, total evaluations, best vs last energy, and explicit tie ranking.
     """
-    hamiltonian, exact_energy, meta = load_or_build_bn_dot_hamiltonian(basis=basis)
-    hf_energy = meta["hf_energy"]
-    delta_corr = abs(hf_energy - exact_energy)
-    ansatze = get_ansatz_dict()
+    hamiltonian, exact_energy, meta = load_or_build_bn_dot_hamiltonian(
+        basis=basis,
+        n_active_electrons=n_active_electrons,
+        n_active_orbitals=n_active_orbitals,
+        orbital_method=orbital_method
+    )
     
-    cache_path = DATA_DIR / f"benchmark_results_{basis.replace('(', '').replace(')', '').replace(',', '_')}.json"
+    hf_energy = meta["hf_energy"]
+    ref_det_energy = meta.get("reference_determinant_energy", hf_energy)
+    delta_corr = abs(ref_det_energy - exact_energy)
+    
+    clean_basis = "6-31gd_p" if "6-31g" in basis.lower() else "sto3g"
+    if (n_active_electrons, n_active_orbitals) == (4, 4):
+        cache_path = DATA_DIR / f"benchmark_results_{clean_basis}_4e4o.json"
+    elif (n_active_electrons, n_active_orbitals) == (6, 6):
+        cache_path = DATA_DIR / f"benchmark_results_{clean_basis}_6e6o.json"
+    else:
+        cache_path = DATA_DIR / f"benchmark_results_{clean_basis}.json"
+
     if use_cache and cache_path.exists():
         if verbose:
             print(f"[CACHE] Loading cached benchmark results from {cache_path}")
@@ -175,11 +192,29 @@ def run_full_vqe_benchmark(
         convergence_df = pd.DataFrame(data["convergence"])
         return results_df, convergence_df, meta
     
+    ansatze = get_ansatz_dict(
+        num_spatial_orbitals=n_active_orbitals,
+        num_particles=(n_active_electrons // 2, n_active_electrons // 2)
+    )
+    
+    # Pre-decompose UCC circuits to eliminate repetitive runtime gate synthesis overhead
+    ansatze_decomp = {}
+    for a_name, qc in ansatze.items():
+        d = qc.decompose()
+        if any(op.name in ["PauliEvolution", "HartreeFock"] for op in d.data):
+            d = d.decompose()
+        ansatze_decomp[a_name] = d
+
     ansatz_names = ["DexcG", "PCU2", "UCCSD", "k-UpCCGSD"]
     init_names = ["zero", "half", "one", "random"]
     optimizer_names = ["GD", "ADAM", "SPSA", "QNSPSA"]
     
     estimator = StatevectorEstimator()
+    try:
+        from qiskit_aer.primitives import EstimatorV2 as AerEstimator
+        estimator = AerEstimator()
+    except Exception:
+        estimator = StatevectorEstimator()
     sampler = StatevectorSampler()
     
     results = []
@@ -188,15 +223,20 @@ def run_full_vqe_benchmark(
     total_runs = len(ansatz_names) * len(init_names) * len(optimizer_names)
     run_idx = 0
     
+    is_smoke_test = (n_active_electrons, n_active_orbitals) == (2, 2)
+    tag = " [SMOKE TEST / TRIVIAL ACTIVE SPACE: E_corr = 0.041 mHa << 1.6 mHa]" if is_smoke_test else ""
+    
     if verbose:
         print("==========================================================================")
-        print(f"Executing VQE Benchmark for {meta['label']} ({meta['molecule']}) | Basis: {basis}")
+        print(f"Executing VQE Benchmark for {meta['label']} ({meta['molecule']}) | Basis: {basis}{tag}")
+        print(f"Active Space: ({n_active_electrons}e, {n_active_orbitals}o) -> {meta['num_qubits']} qubits | Pauli terms: {meta['num_pauli_terms']}")
         print(f"Total Configurations: {total_runs} (4 ansatz x 4 inits x 4 optimizers, {maxiter} iter each)")
-        print(f"RHF Reference: {hf_energy:.8f} Ha | Exact CASCI: {exact_energy:.8f} Ha | E_corr: {meta['correlation_energy_mHa']:.5f} mHa")
+        print(f"Ref Det Reference: {ref_det_energy:.8f} Ha | Exact CASCI: {exact_energy:.8f} Ha | E_corr: {meta['correlation_energy_mHa']:.5f} mHa")
+        print(f"Chemical Accuracy Threshold: 1.6000 mHa (HF baseline is {meta['correlation_energy_mHa']:.4f} mHa from exact)")
         print("==========================================================================")
 
     for a_name in ansatz_names:
-        qc = ansatze[a_name]
+        qc = ansatze_decomp[a_name]
         for i_name in init_names:
             for o_name in optimizer_names:
                 run_idx += 1
@@ -219,8 +259,7 @@ def run_full_vqe_benchmark(
                 error_mHa = abs(final_e - exact_energy) * 1000.0
                 rel_error = (abs(final_e - exact_energy) / abs(exact_energy)) * 100.0
                 
-                # % Correlation Recovered = (E_HF - E_VQE) / (E_HF - E_exact) * 100%
-                pct_corr = ((hf_energy - final_e) / delta_corr) if delta_corr > 1e-12 else 1.0
+                pct_corr = ((ref_det_energy - final_e) / delta_corr) if delta_corr > 1e-12 else 1.0
                 
                 results.append({
                     "Config_ID": run_idx,
@@ -247,13 +286,20 @@ def run_full_vqe_benchmark(
                     
     results_df = pd.DataFrame(results)
     
-    # Create convergence DataFrame with 51 points (Iteration 0 to maxiter)
+    # Build convergence DataFrame: use the shortest history length across all configs
+    # (handles variable-length histories from different optimizers/maxiter settings)
     conv_records = []
-    for it in range(maxiter + 1):
-        row = {"Iteration": it}
+    if convergence_data:
+        actual_len = min(len(hist) for hist in convergence_data.values())
+    else:
+        actual_len = maxiter + 1
+        
+    for it_idx in range(actual_len):
+        row = {"Iteration": it_idx}
         for cfg, hist in convergence_data.items():
-            row[cfg] = hist[it] if it < len(hist) else hist[-1]
+            row[cfg] = hist[it_idx] if it_idx < len(hist) else hist[-1]
         conv_records.append(row)
+        
     convergence_df = pd.DataFrame(conv_records)
     
     # Save cache
@@ -270,6 +316,7 @@ def run_full_vqe_benchmark(
         print("==========================================================================")
         
     return results_df, convergence_df, meta
+
 
 if __name__ == "__main__":
     rdf, cdf, meta = run_full_vqe_benchmark(basis="6-31g(d,p)", maxiter=50)

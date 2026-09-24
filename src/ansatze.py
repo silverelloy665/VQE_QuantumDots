@@ -39,6 +39,7 @@ def build_particle_conserving_u2(
         - Even-pair entanglers on (0,1), (2,3): CNOT - CRX - CNOT (2 params)
         - Odd-pair entanglers on (1,2): CNOT - CRX - CNOT (1 param)
     Total parameters per rep = 4 + 2 + 1 = 7. For reps=2, total parameters = 14.
+    For 2e/2o with reps=2, total parameters = 2 * (4 + 2 + 1) = 14.
     """
     mapper = qubit_mapper or JordanWignerMapper()
     num_qubits = num_spatial_orbitals * 2
@@ -89,12 +90,14 @@ def get_ansatz_dict(
     Returns the dictionary of the 4 benchmark ansätze:
     - DexcG: UCC with excitations='d'
     - PCU2: ParticleConservingU2 (2 reps)
+    - PCU2: ParticleConservingU2 (reps=pcu2_reps)
     - UCCSD: UCC with excitations='sd'
     - k-UpCCGSD: UCC with excitations='sd', generalized=True, reps=k (k=3)
     - DexcG: UCC with excitations='d' (1 parameter for 2e/2o)
     - PCU2: ParticleConservingU2 (reps=2, 14 parameters for 2e/2o)
     - UCCSD: UCC with excitations='sd' (3 parameters for 2e/2o)
     - k-UpCCGSD: Generalized UCC with excitations='sd', generalized=True, reps=k (k=3, 9 parameters for 2e/2o).
+    - k-UpCCGSD: Generalized UCC with excitations='sd', generalized=True, reps=k_reps.
       Note: This is a generalized unitary coupled cluster ansatz with k repetitions and is not pair-restricted.
     """
     mapper = JordanWignerMapper()

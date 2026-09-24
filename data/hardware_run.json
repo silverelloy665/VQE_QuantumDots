@@ -1,20 +1,47 @@
 {
   "status": "COMPLETED_ON_PHYSICAL_QPU",
   "backend": "ibm_fez",
-  "job_id": "daor3p5r85ps73ffmvn0",
-  "ansatz": "UCCSD",
-  "parameter_vector": [
+  "job_id": "daqkle3t55cs738rsfrg",
+  "ansatz": "DexcG",
+  "parameter_sweep": [
+    -0.1,
+    -0.05,
     0.0,
-    0.0,
-    0.0
+    0.05,
+    0.1
   ],
   "optimization_level": 3,
-  "resilience_options": "default",
   "shots": 4096,
-  "transpiled_depth": 1,
-  "transpiled_2q_gates": 0,
-  "qpu_seconds": 30.35,
-  "measured_energy_ha": -639.7236460864065,
-  "exact_casci_energy_ha": -639.724283227178,
-  "error_mha": 0.6371407715732857
+  "transpiled_depth": 144,
+  "transpiled_2q_gates": 42,
+  "qpu_seconds": 20.0,
+  "elapsed_wall_time_s": 77.18,
+  "exact_casci_energy_ha": -639.7242832271774,
+  "landscape_results": [
+    {
+      "theta": -0.1,
+      "measured_energy_ha": -639.586060393876,
+      "error_mha": 138.22283330136997
+    },
+    {
+      "theta": -0.05,
+      "measured_energy_ha": -639.5935427082192,
+      "error_mha": 130.7405189581914
+    },
+    {
+      "theta": 0.0,
+      "measured_energy_ha": -639.5967578364172,
+      "error_mha": 127.52539076018365
+    },
+    {
+      "theta": 0.05,
+      "measured_energy_ha": -639.5969116885061,
+      "error_mha": 127.37153867124107
+    },
+    {
+      "theta": 0.1,
+      "measured_energy_ha": -639.5859589771059,
+      "error_mha": 138.3242500714914
+    }
+  ]
 }

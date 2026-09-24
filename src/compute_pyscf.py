@@ -2,12 +2,9 @@
 Electronic structure calculations for BN Quantum Dot (B8N8H10) using PySCF.
 Computes RHF, DFT/B3LYP, and CASCI active spaces ((2e,2o), (4e,4o), (6e,6o)).
 """
-import os
-import sys
 import json
-import numpy as np
-from pyscf import gto, scf, mcscf, ao2mo
 from pathlib import Path
+import numpy as np
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -39,147 +36,177 @@ N -3.58915454 -4.17672844 0.0
 H -3.61799991 -5.18631645 0.0
 H -5.86230230 -3.98673035 0.0
 H -1.30886684 -4.11682851 0.0
-"""
 """.strip()
 
-def compute_active_space(basis="sto-3g", n_active_electrons=2, n_active_orbitals=2):
+
 def compute_active_space(
     basis: str = "6-31g(d,p)",
     n_active_electrons: int = 2,
     n_active_orbitals: int = 2,
-    orbital_method: str = "rhf"
-) -> dict:
+    orbital_method: str = "rhf",
+    mf=None,
+    hf_energy: float = None
+) -> tuple[dict, object]:
     """
     Performs electronic structure calculation for B8N8H10 and generates active-space integrals.
-    Requires PySCF (run in PySCF-supported environment e.g. Linux / WSL).
+    Uses spherical d functions (mol.cart = False, PySCF default: 274 AOs for 6-31G(d,p)).
+    Requires PySCF (run inside WSL/Linux).
+
+    Returns:
+        (data_dict, mf): cache dictionary and mean-field object for reuse.
     """
     from pyscf import gto, scf, mcscf, ao2mo, dft
-    
+
     mol = gto.Mole()
     mol.atom = GEOMETRY_STR
     mol.basis = basis
     mol.charge = 0
     mol.spin = 0
     mol.unit = "Angstrom"
+    # Set cart explicitly to False: spherical d functions (274 AOs for 6-31G(d,p), standard PySCF default).
+    # Gaussian convention uses Cartesian d functions (290 AOs).
+    mol.cart = False
     mol.build()
-    
+
     nuclear_repulsion = float(mol.energy_nuc())
-    
-    if orbital_method.lower() == "b3lyp":
-        print(f"[{basis.upper()}] Computing RKS (B3LYP)...")
-        mf = dft.RKS(mol)
-        mf.xc = "b3lyp"
-        mf.kernel()
-        scf_energy = float(mf.e_tot)
-        dft_total_energy = scf_energy
-        print(f"[{basis.upper()}] B3LYP total energy = {dft_total_energy:.8f} Ha")
+
+    if mf is None:
+        if orbital_method.lower() == "b3lyp":
+            print(f"[{basis.upper()}] Computing RKS (B3LYP)...")
+            mf = dft.RKS(mol)
+            mf.xc = "b3lyp"
+            mf.kernel()
+            scf_energy = float(mf.e_tot)
+            dft_total_energy = scf_energy
+            if hf_energy is None:
+                print(f"[{basis.upper()}] Computing RHF for reference hf_energy...")
+                rhf_mf = scf.RHF(mol)
+                rhf_mf.kernel()
+                hf_energy = float(rhf_mf.e_tot)
+            print(f"[{basis.upper()}] B3LYP total energy = {dft_total_energy:.8f} Ha (RHF = {hf_energy:.8f} Ha)")
+        else:
+            print(f"[{basis.upper()}] Computing RHF...")
+            mf = scf.RHF(mol)
+            mf.kernel()
+            scf_energy = float(mf.e_tot)
+            hf_energy = scf_energy
+            dft_total_energy = None
+            print(f"[{basis.upper()}] RHF energy = {scf_energy:.8f} Ha")
     else:
-        print(f"[{basis.upper()}] Computing RHF...")
-        mf = scf.RHF(mol)
-        mf.kernel()
-        scf_energy = float(mf.e_tot)
-        dft_total_energy = None
-        print(f"[{basis.upper()}] RHF energy = {scf_energy:.8f} Ha")
+        if orbital_method.lower() == "b3lyp":
+            scf_energy = float(mf.e_tot)
+            dft_total_energy = scf_energy
+            if hf_energy is None:
+                rhf_mf = scf.RHF(mol)
+                rhf_mf.kernel()
+                hf_energy = float(rhf_mf.e_tot)
+        else:
+            scf_energy = float(mf.e_tot)
+            hf_energy = scf_energy
+            dft_total_energy = None
 
-    print(f"[{basis.upper()}] Computing RHF...")
-    mf = scf.RHF(mol)
-    mf.kernel()
-    hf_energy = float(mf.e_tot)
-    nuclear_repulsion_energy = float(mol.energy_nuc())
-    print(f"[{basis.upper()}] RHF Energy = {hf_energy:.8f} Ha, Nuc = {nuclear_repulsion_energy:.8f} Ha")
-
-    # CAS active space calculation
+    # CAS active space calculation using mf (single mean-field object for both orbitals and CASCI)
     cas = mcscf.CASSCF(mf, n_active_orbitals, n_active_electrons)
-    # Compute 1-e and 2-e integrals in active space
     mo_coeff = mf.mo_coeff
     ncore = (mol.nelectron - n_active_electrons) // 2
     ncas = n_active_orbitals
     cas_idx = slice(ncore, ncore + ncas)
-    
-    # Active space core energy and effective 1-e integrals
-    cas = mcscf.CASSCF(mf, n_active_orbitals, n_active_electrons)
+
+    # Active space effective 1-e integrals and core energy.
+    # e_core includes nuclear repulsion energy and inactive core electron interactions.
     h1e_active, e_core = cas.get_h1eff(mo_coeff=mo_coeff)
-    e_inactive = float(e_core) + nuclear_repulsion_energy
-    e_inactive = float(e_core) + nuclear_repulsion
-    
+    e_core = float(e_core)
+
     # 2-electron integrals in active space (chemist notation: (pq|rs))
     cas_mo = mo_coeff[:, cas_idx]
     eri_active = ao2mo.kernel(mol, cas_mo)
-    eri_active = ao2mo.restore(1, eri_active, ncas) # 4-index tensor (ncas, ncas, ncas, ncas)
+    eri_active = ao2mo.restore(1, eri_active, ncas)  # 4-index tensor (ncas, ncas, ncas, ncas)
 
     # CASCI reference energy for active space
-    eri_active = ao2mo.restore(1, eri_active, ncas) # 4-index tensor
-    
     mc = mcscf.CASCI(mf, n_active_orbitals, n_active_electrons)
     e_casci = float(mc.kernel()[0])
-    print(f"[{basis.upper()}] CASCI Ground State Energy = {e_casci:.8f} Ha")
-    e_corr_mHa = abs(scf_energy - e_casci) * 1000.0
-    print(f"[{basis.upper()}] CASCI Ground Energy ({n_active_electrons}e, {n_active_orbitals}o) = {e_casci:.8f} Ha | E_corr = {e_corr_mHa:.5f} mHa")
+
+    # Reference determinant energy: <HF|H|HF> in active space + e_core
+    # Active electrons occupy the lowest k = n_active_electrons // 2 spatial orbitals
+    k = n_active_electrons // 2
+    e1_det = 2.0 * sum(h1e_active[i, i] for i in range(k))
+    e2_det = sum(2.0 * eri_active[i, i, j, j] - eri_active[i, j, j, i] for i in range(k) for j in range(k))
+    reference_determinant_energy = float(e1_det + e2_det + e_core)
+
+    # Active space correlation energy = |reference_determinant_energy - casci_energy| * 1000 (mHa)
+    e_corr_mHa = abs(reference_determinant_energy - e_casci) * 1000.0
+
+    print(
+        f"[{basis.upper()} {orbital_method.upper()} ({n_active_electrons}e, {n_active_orbitals}o)] "
+        f"Ref Det = {reference_determinant_energy:.8f} Ha | CASCI = {e_casci:.8f} Ha | E_corr = {e_corr_mHa:.5f} mHa"
+    )
 
     data = {
         "molecule": "B8N8H10",
         "label": "BN quantum dot",
         "basis": basis,
         "orbital_method": orbital_method,
+        "cart": False,
+        "n_basis_functions": int(mol.nao),
         "n_atoms": 26,
-        "n_electrons": mol.nelectron,
+        "n_electrons": int(mol.nelectron),
         "n_active_electrons": n_active_electrons,
         "n_active_orbitals": n_active_orbitals,
         "num_qubits": n_active_orbitals * 2,
         "hf_energy": hf_energy,
-        "nuclear_repulsion_energy": nuclear_repulsion_energy,
-        "hf_energy": scf_energy if orbital_method == "rhf" else float(scf.RHF(mol).kernel()),
         "scf_energy": scf_energy,
         "dft_total_energy": dft_total_energy,
         "nuclear_repulsion_energy": nuclear_repulsion,
-        "inactive_energy": float(e_core),
-        "total_inactive_energy": e_inactive,
+        "e_core": e_core,  # PySCF core energy incl. E_nuc and inactive electrons
+        "inactive_energy": e_core,  # Alias kept for backward compatibility
+        "reference_determinant_energy": reference_determinant_energy,
         "casci_energy": e_casci,
         "correlation_energy_mHa": e_corr_mHa,
         "h1_active": h1e_active.tolist(),
         "h2_active": eri_active.tolist(),
         "mo_energies": mf.mo_energy.tolist()[:10],
     }
-    return data
+    return data, mf
 
-if __name__ == "__main__":
+
 def generate_all_active_space_caches():
-    """Generates and saves all active-space caches for STO-3G and 6-31G(d,p)."""
-    # 1. STO-3G (2e, 2o)
-    sto3g_data = compute_active_space(basis="sto-3g", n_active_electrons=2, n_active_orbitals=2)
-    with open("data/bn_dot_sto3g.json", "w") as f:
-    with open(DATA_DIR / "bn_dot_sto3g.json", "w") as f:
+    """Generates and saves all 5 active-space caches for STO-3G and 6-31G(d,p)."""
+    # 1. STO-3G (2e, 2o) RHF
+    sto3g_data, _ = compute_active_space(basis="sto-3g", n_active_electrons=2, n_active_orbitals=2, orbital_method="rhf")
+    with open(DATA_DIR / "bn_dot_sto3g.json", "w", encoding="utf-8") as f:
         json.dump(sto3g_data, f, indent=2)
-    print("[OK] Saved STO-3G data to data/bn_dot_sto3g.json")
-    print("[OK] Saved bn_dot_sto3g.json")
+    print(f"[OK] Saved bn_dot_sto3g.json to {DATA_DIR}")
 
-    basis_631gdp_data = compute_active_space(basis="6-31g(d,p)", n_active_electrons=2, n_active_orbitals=2)
-    with open("data/bn_dot_631gdp.json", "w") as f:
-        json.dump(basis_631gdp_data, f, indent=2)
-    print("[OK] Saved 6-31G(d,p) data to data/bn_dot_631gdp.json")
-    # 2. 6-31G(d,p) (2e, 2o)
-    gdp_2e2o = compute_active_space(basis="6-31g(d,p)", n_active_electrons=2, n_active_orbitals=2)
-    with open(DATA_DIR / "bn_dot_631gdp.json", "w") as f:
+    # 2. 6-31G(d,p) RHF (2e, 2o) - run RHF once and reuse mf
+    gdp_2e2o, mf_rhf = compute_active_space(basis="6-31g(d,p)", n_active_electrons=2, n_active_orbitals=2, orbital_method="rhf")
+    with open(DATA_DIR / "bn_dot_631gdp.json", "w", encoding="utf-8") as f:
         json.dump(gdp_2e2o, f, indent=2)
-    print("[OK] Saved bn_dot_631gdp.json")
+    print(f"[OK] Saved bn_dot_631gdp.json to {DATA_DIR}")
 
-    # 3. 6-31G(d,p) (4e, 4o)
-    gdp_4e4o = compute_active_space(basis="6-31g(d,p)", n_active_electrons=4, n_active_orbitals=4)
-    with open(DATA_DIR / "bn_dot_631gdp_4e4o.json", "w") as f:
+    # 3. 6-31G(d,p) RHF (4e, 4o)
+    gdp_4e4o, _ = compute_active_space(basis="6-31g(d,p)", n_active_electrons=4, n_active_orbitals=4, orbital_method="rhf", mf=mf_rhf)
+    with open(DATA_DIR / "bn_dot_631gdp_4e4o.json", "w", encoding="utf-8") as f:
         json.dump(gdp_4e4o, f, indent=2)
-    print("[OK] Saved bn_dot_631gdp_4e4o.json")
+    print(f"[OK] Saved bn_dot_631gdp_4e4o.json to {DATA_DIR}")
 
-    # 4. 6-31G(d,p) (6e, 6o)
-    gdp_6e6o = compute_active_space(basis="6-31g(d,p)", n_active_electrons=6, n_active_orbitals=6)
-    with open(DATA_DIR / "bn_dot_631gdp_6e6o.json", "w") as f:
+    # 4. 6-31G(d,p) RHF (6e, 6o)
+    gdp_6e6o, _ = compute_active_space(basis="6-31g(d,p)", n_active_electrons=6, n_active_orbitals=6, orbital_method="rhf", mf=mf_rhf)
+    with open(DATA_DIR / "bn_dot_631gdp_6e6o.json", "w", encoding="utf-8") as f:
         json.dump(gdp_6e6o, f, indent=2)
-    print("[OK] Saved bn_dot_631gdp_6e6o.json")
+    print(f"[OK] Saved bn_dot_631gdp_6e6o.json to {DATA_DIR}")
 
     # 5. 6-31G(d,p) B3LYP orbitals (2e, 2o)
-    b3lyp_data = compute_active_space(basis="6-31g(d,p)", n_active_electrons=2, n_active_orbitals=2, orbital_method="b3lyp")
-    with open(DATA_DIR / "bn_dot_631gdp_b3lyp.json", "w") as f:
+    b3lyp_data, _ = compute_active_space(
+        basis="6-31g(d,p)",
+        n_active_electrons=2,
+        n_active_orbitals=2,
+        orbital_method="b3lyp",
+        hf_energy=gdp_2e2o["hf_energy"]
+    )
+    with open(DATA_DIR / "bn_dot_631gdp_b3lyp.json", "w", encoding="utf-8") as f:
         json.dump(b3lyp_data, f, indent=2)
-    print("[OK] Saved bn_dot_631gdp_b3lyp.json")
+    print(f"[OK] Saved bn_dot_631gdp_b3lyp.json to {DATA_DIR}")
+
 
 if __name__ == "__main__":
     generate_all_active_space_caches()

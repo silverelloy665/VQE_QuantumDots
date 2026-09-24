@@ -45,6 +45,9 @@ H -5.86230230 -3.98673035 0.0
 H -1.30886684 -4.11682851 0.0
 """.strip()
 
+from functools import lru_cache
+
+@lru_cache(maxsize=16)
 def load_or_build_bn_dot_hamiltonian(
     basis: str = "6-31g(d,p)",
     n_active_electrons: int = 2,
@@ -99,14 +102,24 @@ def load_or_build_bn_dot_hamiltonian(
     
     casci_energy = float(data["casci_energy"])
     hf_energy = float(data["hf_energy"])
+    e_core = float(data.get("e_core", data.get("inactive_energy")))
+    reference_determinant_energy = float(data.get("reference_determinant_energy", hf_energy))
+    
     energy_shift = casci_energy - active_ground_energy
+    shift_diff = abs(energy_shift - e_core)
+    assert shift_diff < 1e-6, (
+        f"Energy shift mismatch: casci_energy - active_ground_energy = {energy_shift:.10f} Ha, "
+        f"e_core = {e_core:.10f} Ha (difference = {shift_diff:.2e} Ha exceeds tolerance 1e-6 Ha)"
+    )
     
     # Add identity term shift to qubit Hamiltonian
+    # Add identity term shift to qubit Hamiltonian (keeping shift as a checked identity)
     num_qubits = active_qubit_op.num_qubits
     id_op = SparsePauliOp(["I" * num_qubits], [energy_shift])
     full_qubit_hamiltonian = (active_qubit_op + id_op).simplify()
     
     e_corr_mHa = abs(hf_energy - casci_energy) * 1000.0
+    e_corr_mHa = abs(reference_determinant_energy - casci_energy) * 1000.0
     if e_corr_mHa < 1.0:
         warnings.warn(
             f"Active space ({n_active_electrons}e, {n_active_orbitals}o) has small correlation energy "
@@ -120,6 +133,8 @@ def load_or_build_bn_dot_hamiltonian(
         "label": data["label"],
         "basis": data["basis"],
         "orbital_method": data.get("orbital_method", orbital_method),
+        "cart": data.get("cart", False),
+        "n_basis_functions": data.get("n_basis_functions", 274 if "6-31g" in basis.lower() else 52),
         "n_atoms": data["n_atoms"],
         "n_electrons": data["n_electrons"],
         "n_active_electrons": data["n_active_electrons"],
@@ -127,7 +142,11 @@ def load_or_build_bn_dot_hamiltonian(
         "num_qubits": num_qubits,
         "num_pauli_terms": len(full_qubit_hamiltonian),
         "hf_energy": hf_energy,
+        "scf_energy": float(data.get("scf_energy", hf_energy)),
+        "reference_determinant_energy": reference_determinant_energy,
         "casci_energy": casci_energy,
+        "e_core": e_core,
+        "inactive_energy": e_core,
         "active_ground_energy": active_ground_energy,
         "energy_shift": energy_shift,
         "exact_ground_energy": casci_energy,

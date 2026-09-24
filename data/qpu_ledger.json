@@ -1,0 +1,27 @@
+{
+  "budget_limit_seconds": 600.0,
+  "total_consumed_seconds": 50.35,
+  "remaining_seconds": 549.65,
+  "runs": [
+    {
+      "timestamp": "2026-09-24T15:58:59.507184+00:00",
+      "backend": "ibm_fez",
+      "job_id": "daor3p5r85ps73ffmvn0",
+      "status": "COMPLETED",
+      "qpu_seconds": 30.35,
+      "shots": 4096,
+      "ansatz": "UCCSD",
+      "notes": "Historical run from repository record"
+    },
+    {
+      "timestamp": "2026-09-24T16:08:37.679301+00:00",
+      "backend": "ibm_fez",
+      "job_id": "daqkle3t55cs738rsfrg",
+      "status": "COMPLETED",
+      "qpu_seconds": 20.0,
+      "shots": 4096,
+      "ansatz": "DexcG",
+      "notes": "5-point landscape PUB verification"
+    }
+  ]
+}
