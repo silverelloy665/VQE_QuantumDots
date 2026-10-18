@@ -239,14 +239,42 @@ def run_scan():
             writer.writerow(r)
     print(f"\n[OK] Saved active space scan to {csv_path}")
 
-    # Pick the smallest (qubits) case with gap >= 5 mHa as the "hard benchmark"
-    # Sort candidates by qubits ascending, then gap descending
-    hard_candidates.sort(key=lambda c: (c[0], -c[1]))
-    if not hard_candidates:
-        print("[ERROR] No candidate found with gap >= 5.0 mHa and qubits <= 12!")
+    # Helper to check full Fock space sector and CASCI match
+    from qiskit_nature.second_q.hamiltonians import ElectronicEnergy
+    from qiskit_nature.second_q.mappers import JordanWignerMapper
+
+    def check_sector_and_casci(h1, eri, e_core, e_casci, ne, no):
+        h2_phys = np.einsum("pqrs->prqs", eri)
+        ee = ElectronicEnergy.from_raw_integrals(h1, h2_phys)
+        qubit_op = JordanWignerMapper().map(ee.second_q_op())
+        mat = qubit_op.to_matrix()
+        evals, evecs = np.linalg.eigh(mat)
+        diff = abs(float(evals[0] + e_core) - float(e_casci))
+        if diff > 1e-8:
+            return False, diff
+        gs = evecs[:, 0]
+        # check dominant bitstring sector
+        max_idx = np.argmax(np.abs(gs)**2)
+        bits = format(max_idx, f"0{2*no}b")
+        q_occ = [int(b) for b in reversed(bits)]
+        sec = (sum(q_occ[:no]), sum(q_occ[no:]))
+        return (sec == (ne // 2, ne // 2)), diff
+
+    # Filter candidates: must have gap >= 5.0, qubits <= 12, RHF stable, AND full Fock ground in (Na, Nb) sector
+    valid_candidates = []
+    for cand in hard_candidates:
+        c_qubits, c_gap, c_scale, c_ne, c_no, c_sel, c_h1, c_eri, c_ecore, c_eref, c_ecas, c_mol, c_mf = cand
+        valid_sector, diff = check_sector_and_casci(c_h1, c_eri, c_ecore, c_ecas, c_ne, c_no)
+        print(f"Candidate scale={c_scale} ({c_ne}e,{c_no}o) {c_sel}: gap={c_gap:.4f} mHa, diff={diff:.2e}, valid_sector={valid_sector}")
+        if valid_sector:
+            valid_candidates.append(cand)
+
+    valid_candidates.sort(key=lambda c: (c[0], -c[1]))
+    if not valid_candidates:
+        print("[ERROR] No valid candidate found with ground state in target sector!")
         return
 
-    best = hard_candidates[0]
+    best = valid_candidates[0]
     b_qubits, b_gap, b_scale, b_ne, b_no, b_sel, b_h1, b_eri, b_ecore, b_eref, b_ecas, b_mol, b_mf = best
     print(f"\n=== CHOSEN HARD BENCHMARK ===")
     print(f"Scale: {b_scale}, Active Space: ({b_ne}e, {b_no}o) -> {b_qubits} qubits")
