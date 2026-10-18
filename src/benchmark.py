@@ -31,7 +31,7 @@ def run_lr_sweep(
     on a held-out seed to determine optimal learning rates per optimizer.
     """
     if lr_candidates is None:
-        lr_candidates = [0.005, 0.01, 0.02, 0.05, 0.1, 0.5]
+        lr_candidates = [0.01, 0.05, 0.1, 0.3]
         
     cache_path = DATA_DIR / "lr_sweep_results.json"
     if use_cache and cache_path.exists():
@@ -157,12 +157,14 @@ def run_full_vqe_benchmark(
     orbital_method: str = "rhf",
     maxiter: int = 50,
     seed: int = 42,
+    seeds: list[int] | None = None,
     verbose: bool = True,
     use_cache: bool = True
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
     """
-    Executes the full 64-run VQE benchmark grid: 4 ansätze x 4 inits x 4 optimizers.
-    Calculates % correlation recovered, total evaluations, best vs last energy, and explicit tie ranking.
+    Executes the full VQE benchmark grid across Ansätze x Inits x Optimizers.
+    Calculates % correlation recovered, better_than_HF flag, function evaluations,
+    and multi-seed robustness metrics (median, IQR, min, success rate).
     """
     hamiltonian, exact_energy, meta = load_or_build_bn_dot_hamiltonian(
         basis=basis,
@@ -174,6 +176,10 @@ def run_full_vqe_benchmark(
     hf_energy = meta["hf_energy"]
     ref_det_energy = meta.get("reference_determinant_energy", hf_energy)
     delta_corr = abs(ref_det_energy - exact_energy)
+    gap_mHa = delta_corr * 1000.0
+    is_too_easy = (gap_mHa < 1.0)
+    meta["hf_casci_gap_mHa"] = gap_mHa
+    meta["is_too_easy"] = is_too_easy
     
     clean_basis = "6-31gd_p" if "6-31g" in basis.lower() else "sto3g"
     if (n_active_electrons, n_active_orbitals) == (4, 4):
@@ -209,6 +215,8 @@ def run_full_vqe_benchmark(
     init_names = ["zero", "half", "one", "random"]
     optimizer_names = ["GD", "ADAM", "SPSA", "QNSPSA"]
     
+    seed_list = seeds if seeds is not None else [seed]
+    
     estimator = StatevectorEstimator()
     try:
         from qiskit_aer.primitives import EstimatorV2 as AerEstimator
@@ -223,16 +231,15 @@ def run_full_vqe_benchmark(
     total_runs = len(ansatz_names) * len(init_names) * len(optimizer_names)
     run_idx = 0
     
-    is_smoke_test = (n_active_electrons, n_active_orbitals) == (2, 2)
-    tag = " [SMOKE TEST / TRIVIAL ACTIVE SPACE: E_corr = 0.041 mHa << 1.6 mHa]" if is_smoke_test else ""
+    tag = f" [GAP={gap_mHa:.4f} mHa: {'TOO EASY (<1 mHa)' if is_too_easy else 'MEANINGFUL (>1 mHa)'}]"
     
     if verbose:
         print("==========================================================================")
         print(f"Executing VQE Benchmark for {meta['label']} ({meta['molecule']}) | Basis: {basis}{tag}")
         print(f"Active Space: ({n_active_electrons}e, {n_active_orbitals}o) -> {meta['num_qubits']} qubits | Pauli terms: {meta['num_pauli_terms']}")
-        print(f"Total Configurations: {total_runs} (4 ansatz x 4 inits x 4 optimizers, {maxiter} iter each)")
-        print(f"Ref Det Reference: {ref_det_energy:.8f} Ha | Exact CASCI: {exact_energy:.8f} Ha | E_corr: {meta['correlation_energy_mHa']:.5f} mHa")
-        print(f"Chemical Accuracy Threshold: 1.6000 mHa (HF baseline is {meta['correlation_energy_mHa']:.4f} mHa from exact)")
+        print(f"Total Configurations: {total_runs} (4 ansatz x 4 inits x 4 optimizers, {len(seed_list)} seed(s) each, {maxiter} iter)")
+        print(f"Ref Det Reference: {ref_det_energy:.8f} Ha | Exact CASCI: {exact_energy:.8f} Ha | E_corr: {gap_mHa:.5f} mHa")
+        print(f"Chemical Accuracy Threshold: 1.6000 mHa (HF baseline is {gap_mHa:.4f} mHa from exact)")
         print("==========================================================================")
 
     for a_name in ansatz_names:
@@ -242,47 +249,79 @@ def run_full_vqe_benchmark(
                 run_idx += 1
                 cfg_label = f"{a_name}_{i_name}_{o_name}"
                 
-                res = run_vqe_single(
-                    circuit=qc,
-                    hamiltonian=hamiltonian,
-                    ansatz_name=a_name,
-                    init_name=i_name,
-                    optimizer_name=o_name,
-                    maxiter=maxiter,
-                    estimator=estimator,
-                    sampler=sampler,
-                    seed=seed
-                )
+                seed_runs = []
+                for s in seed_list:
+                    res = run_vqe_single(
+                        circuit=qc,
+                        hamiltonian=hamiltonian,
+                        ansatz_name=a_name,
+                        init_name=i_name,
+                        optimizer_name=o_name,
+                        maxiter=maxiter,
+                        estimator=estimator,
+                        sampler=sampler,
+                        seed=s
+                    )
+                    fe = res["final_energy"]
+                    be = res["best_energy"]
+                    err = abs(fe - exact_energy) * 1000.0
+                    p_corr = ((ref_det_energy - fe) / delta_corr) if delta_corr > 1e-12 else 1.0
+                    b_hf = bool(fe < (ref_det_energy - 1e-12))
+                    seed_runs.append({
+                        "res": res,
+                        "final_e": fe,
+                        "best_e": be,
+                        "error_mHa": err,
+                        "pct_corr": p_corr,
+                        "better_than_HF": b_hf,
+                        "evals": res["total_evaluations"],
+                        "wall_time": res["wall_time"],
+                        "history": res["energy_history"]
+                    })
                 
-                final_e = res["final_energy"]
-                best_e = res["best_energy"]
-                error_mHa = abs(final_e - exact_energy) * 1000.0
-                rel_error = (abs(final_e - exact_energy) / abs(exact_energy)) * 100.0
+                rep = seed_runs[0]
+                final_e = rep["final_e"]
+                best_e = rep["best_e"]
+                error_mHa = rep["error_mHa"]
+                pct_corr = rep["pct_corr"]
+                better_than_hf = rep["better_than_HF"]
                 
-                pct_corr = ((ref_det_energy - final_e) / delta_corr) if delta_corr > 1e-12 else 1.0
+                all_errors = [sr["error_mHa"] for sr in seed_runs]
+                all_b_hf = [sr["better_than_HF"] for sr in seed_runs]
                 
-                results.append({
+                rec = {
                     "Config_ID": run_idx,
                     "Ansatz": a_name,
                     "Initialization": i_name,
                     "Optimizer": o_name,
-                    "Parameters": res["num_params"],
+                    "Parameters": rep["res"]["num_params"],
                     "Final_Energy_Ha": final_e,
                     "Best_Energy_Ha": best_e,
                     "Exact_Energy_Ha": exact_energy,
                     "Error_mHa": error_mHa,
+                    "pct_corr_recovered": pct_corr * 100.0,
                     "Pct_Corr_Recovered": pct_corr,
-                    "Rel_Error_Pct": rel_error,
-                    "Total_Evaluations": res["total_evaluations"],
-                    "Wall_Time_s": res["wall_time"],
-                    "Iterations": maxiter
-                })
+                    "better_than_HF": better_than_hf,
+                    "Rel_Error_Pct": (abs(final_e - exact_energy) / abs(exact_energy)) * 100.0,
+                    "Total_Evaluations": rep["evals"],
+                    "Wall_Time_s": rep["wall_time"],
+                    "Iterations": maxiter,
+                    "Final_Params": rep["res"]["final_params"].tolist() if isinstance(rep["res"]["final_params"], np.ndarray) else list(rep["res"]["final_params"]),
+                    "Best_Params": rep["res"]["best_params"].tolist() if isinstance(rep["res"]["best_params"], np.ndarray) else list(rep["res"]["best_params"])
+                }
                 
-                convergence_data[cfg_label] = res["energy_history"]
+                if len(seed_list) > 1:
+                    rec["Median_Error_mHa"] = float(np.median(all_errors))
+                    rec["IQR_Error_mHa"] = float(np.percentile(all_errors, 75) - np.percentile(all_errors, 25))
+                    rec["Min_Error_mHa"] = float(np.min(all_errors))
+                    rec["Success_Rate_pct"] = float(np.mean([(e < 1.6 and b) for e, b in zip(all_errors, all_b_hf)])) * 100.0
+                    
+                results.append(rec)
+                convergence_data[cfg_label] = rep["history"]
                 
                 if verbose:
                     print(f"[{run_idx:02d}/{total_runs}] {a_name:10s} | {i_name:6s} | {o_name:6s} -> "
-                          f"E_final: {final_e:.8f} Ha | Err: {error_mHa:8.4f} mHa | %Corr: {pct_corr*100:6.2f}% | Evals: {res['total_evaluations']:4d} | Time: {res['wall_time']:.3f}s")
+                          f"E_final: {final_e:.8f} Ha | Err: {error_mHa:8.4f} mHa | %Corr: {pct_corr*100:6.2f}% | Better_HF: {better_than_hf} | Evals: {rep['evals']:4d} | Time: {rep['wall_time']:.3f}s")
                     
     results_df = pd.DataFrame(results)
     
