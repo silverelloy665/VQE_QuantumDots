@@ -38,3 +38,42 @@ def test_particle_number_and_sz_conservation_optimized(setup_system, ansatz_name
     assert np.isclose(exp_n, 2.0, atol=1e-4), f"[{ansatz_name}] Optimized state particle number N = {exp_n:.6f} != 2.0"
     assert np.isclose(exp_sz, 0.0, atol=1e-4), f"[{ansatz_name}] Optimized state Sz = {exp_sz:.6f} != 0.0"
 
+def test_pcu2_random_thetas_strict_sector_conservation(setup_system):
+    """Verifies that for 20 random thetas, 100% of state probability is in (N_alpha=1, N_beta=1)."""
+    _, ansatze, _, _ = setup_system
+    qc = ansatze["PCU2"]
+    allowed = {"0101", "1010", "0110", "1001"}
+    
+    for s in range(20):
+        rng = np.random.RandomState(s)
+        pt = rng.uniform(0, 2 * np.pi, qc.num_parameters)
+        sv = Statevector(qc.assign_parameters(pt))
+        probs = sv.probabilities_dict()
+        w_allowed = sum(p for bitstring, p in probs.items() if bitstring in allowed)
+        assert np.isclose(w_allowed, 1.0, atol=1e-10), f"Seed {s} has weight {w_allowed:.6f} outside (1,1) sector"
+
+def test_pcu2_reachability_multistart_lbfgs(setup_system):
+    """Verifies that multi-start L-BFGS reaches < 0.01 mHa error vs CASCI exact ground state."""
+    H, ansatze, _, _ = setup_system
+    from scipy.optimize import minimize
+    from src.molecule import load_or_build_bn_dot_hamiltonian
+    _, E_exact, _ = load_or_build_bn_dot_hamiltonian("6-31g(d,p)")
+    
+    qc = ansatze["PCU2"]
+    H_mat = H.to_matrix()
+    
+    def cost(p):
+        sv = Statevector(qc.assign_parameters(p)).data
+        return float(np.vdot(sv, H_mat @ sv).real)
+        
+    best_err = 1e9
+    for s in range(10):
+        rng = np.random.RandomState(s * 17)
+        p0 = np.zeros(qc.num_parameters) if s == 0 else rng.uniform(-0.1, 0.1, qc.num_parameters)
+        res = minimize(cost, p0, method="L-BFGS-B", options={"maxiter": 30})
+        err = abs(res.fun - E_exact) * 1000.0
+        if err < best_err:
+            best_err = err
+            
+    assert best_err < 0.01, f"PCU2 reachability test failed: best error {best_err:.6f} mHa >= 0.01 mHa"
+

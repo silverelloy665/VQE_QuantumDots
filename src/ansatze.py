@@ -21,6 +21,8 @@ warnings.filterwarnings("ignore", category=SparseEfficiencyWarning)
 FIGURES_DIR = Path(__file__).resolve().parent.parent / "figures"
 FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
+from qiskit.circuit.library import XXPlusYYGate
+
 def build_particle_conserving_u2(
     num_spatial_orbitals: int = 2,
     num_particles: tuple[int, int] = (1, 1),
@@ -28,56 +30,60 @@ def build_particle_conserving_u2(
     qubit_mapper: JordanWignerMapper | None = None
 ) -> QuantumCircuit:
     """
-    Constructs the hand-built ParticleConservingU2 (PCU2) ansatz:
-    - Hartree-Fock initial state
-    - Hartree-Fock initial state (|0101>)
+    Constructs the genuinely Particle- and Sz-conserving U2 ansatz (ParticleConservingU2):
+    - Hartree-Fock reference state (|0101> for 2e, 2o)
     - For each layer (reps):
-        - RZ rotation on every qubit
-        - Even-pair entanglers on (0,1), (2,3), ... : CNOT - CRX - CNOT
-        - Odd-pair entanglers on (1,2), (3,4), ...  : CNOT - CRX - CNOT
-        - RZ rotation on every qubit (4 params)
-        - Even-pair entanglers on (0,1), (2,3): CNOT - CRX - CNOT (2 params)
-        - Odd-pair entanglers on (1,2): CNOT - CRX - CNOT (1 param)
-    Total parameters per rep = 4 + 2 + 1 = 7. For reps=2, total parameters = 14.
-    For 2e/2o with reps=2, total parameters = 2 * (4 + 2 + 1) = 14.
+        - RZ rotation on every qubit (preserves particle number on every individual qubit)
+        - Spin-aware Givens rotations (XX+YY) on orbital pairs within the alpha and beta sectors:
+            - alpha pair (0, 1) preserves N_alpha = 1
+            - beta pair (2, 3) preserves N_beta = 1
+        - Double-excitation block between alpha and beta sectors, preserving both N=2 and Sz=0
+          (enables variational access to the ground state beyond product-state correlation)
+    For 2e/2o with reps=2:
+        4 RZ + 2 Givens (alpha, beta) + 1 Double excitation = 7 parameters per rep.
+        Total parameters = 2 * 7 = 14 parameters.
+    100% of state probability amplitude remains strictly inside the (N_alpha=1, N_beta=1) sector.
     """
     mapper = qubit_mapper or JordanWignerMapper()
     num_qubits = num_spatial_orbitals * 2
     
-    # 1 RZ per qubit + 1 CRX per even pair + 1 CRX per odd pair
-    n_even_pairs = len(range(0, num_qubits - 1, 2))
-    n_odd_pairs = len(range(1, num_qubits - 1, 2))
-    params_per_rep = num_qubits + n_even_pairs + n_odd_pairs
+    # 4 RZ + 2 Givens (alpha 0-1, beta 2-3) + 1 Double excitation = 7 params per layer
+    params_per_rep = num_qubits + 2 + 1
     total_params = reps * params_per_rep
     
     params = ParameterVector("θ_PCU2", total_params)
-    qc = QuantumCircuit(num_qubits, name="PCU2")
+    qc = QuantumCircuit(num_qubits, name="ParticleConservingU2")
     
     # Hartree-Fock initial state
     hf_state = HartreeFock(num_spatial_orbitals, num_particles, mapper)
     qc.compose(hf_state, inplace=True)
     
+    dexc_template = UCC(
+        num_spatial_orbitals=num_spatial_orbitals,
+        num_particles=num_particles,
+        excitations="d",
+        qubit_mapper=mapper,
+        initial_state=None
+    )
+    
     param_idx = 0
     for r in range(reps):
-        # 1. RZ on every qubit
+        # 1. RZ on every qubit (preserves local particle number)
         for q in range(num_qubits):
             qc.rz(params[param_idx], q)
             param_idx += 1
             
-        # 2. Even pair entanglers: CNOT - CRX - CNOT
-        for q in range(0, num_qubits - 1, 2):
-            qc.cx(q, q + 1)
-            qc.crx(params[param_idx], q, q + 1)
-            qc.cx(q, q + 1)
-            param_idx += 1
-            
-        # 3. Odd pair entanglers: CNOT - CRX - CNOT
-        for q in range(1, num_qubits - 1, 2):
-            qc.cx(q, q + 1)
-            qc.crx(params[param_idx], q, q + 1)
-            qc.cx(q, q + 1)
-            param_idx += 1
-            
+        # 2. Spin-aware Givens rotations: alpha pair (0, 1) and beta pair (2, 3)
+        qc.append(XXPlusYYGate(params[param_idx]), [0, 1])
+        param_idx += 1
+        qc.append(XXPlusYYGate(params[param_idx]), [2, 3])
+        param_idx += 1
+        
+        # 3. Double excitation block coupling alpha and beta pairs
+        d_block = dexc_template.assign_parameters([params[param_idx]])
+        qc.compose(d_block, inplace=True)
+        param_idx += 1
+        
     return qc
 
 def get_ansatz_dict(
