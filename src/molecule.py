@@ -52,7 +52,8 @@ def load_or_build_bn_dot_hamiltonian(
     basis: str = "6-31g(d,p)",
     n_active_electrons: int = 2,
     n_active_orbitals: int = 2,
-    orbital_method: str = "rhf"
+    orbital_method: str = "rhf",
+    cache_file: str = None
 ) -> tuple[SparsePauliOp, float, dict]:
     """
     Loads active-space integrals for BN Quantum Dot and builds the Qiskit Pauli Hamiltonian.
@@ -64,7 +65,9 @@ def load_or_build_bn_dot_hamiltonian(
     """
     clean_basis = "631gdp" if "6-31g" in basis.lower() else "sto3g"
     
-    if orbital_method.lower() == "b3lyp":
+    if cache_file is not None:
+        cache_filename = cache_file
+    elif orbital_method.lower() == "b3lyp":
         cache_filename = f"bn_dot_{clean_basis}_b3lyp.json"
     elif (n_active_electrons, n_active_orbitals) == (4, 4):
         cache_filename = f"bn_dot_{clean_basis}_4e4o.json"
@@ -156,7 +159,19 @@ def load_or_build_bn_dot_hamiltonian(
     
     return full_qubit_hamiltonian, casci_energy, meta
 
+
+def load_hard_hamiltonian() -> tuple[SparsePauliOp, float, dict]:
+    """
+    Loads the hard benchmark Hamiltonian (stretched B-N bonds, 4e4o natural orbitals, 8 qubits)
+    from data/bn_dot_hard.json.
+    """
+    return load_or_build_bn_dot_hamiltonian(cache_file="bn_dot_hard.json")
+
+
 if __name__ == "__main__":
     for b in ["sto-3g", "6-31g(d,p)"]:
         H, E_exact, meta = load_or_build_bn_dot_hamiltonian(basis=b)
         print(f"[{meta['label']} - {b}] Qubits: {meta['num_qubits']}, Pauli terms: {meta['num_pauli_terms']}, Exact Energy: {E_exact:.8f} Ha, E_corr: {meta['correlation_energy_mHa']:.4f} mHa")
+    H_hard, E_hard, meta_hard = load_hard_hamiltonian()
+    print(f"[{meta_hard['label']}] Qubits: {meta_hard['num_qubits']}, Pauli terms: {meta_hard['num_pauli_terms']}, Exact: {E_hard:.8f} Ha, E_corr: {meta_hard['correlation_energy_mHa']:.4f} mHa")
+

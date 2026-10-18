@@ -39,11 +39,54 @@ H -1.30886684 -4.11682851 0.0
 """.strip()
 
 
+def get_scaled_geometry(scale: float = 1.0) -> str:
+    """
+    Scale all B-N bond lengths by `scale` relative to B8N8 core centroid.
+    Preserves all B-H and N-H bond vectors exactly.
+    """
+    if abs(scale - 1.0) < 1e-9:
+        return GEOMETRY_STR
+
+    atoms = []
+    coords = []
+    for line in GEOMETRY_STR.strip().splitlines():
+        parts = line.split()
+        atoms.append(parts[0])
+        coords.append([float(x) for x in parts[1:]])
+    coords = np.array(coords)
+
+    bn_indices = [i for i, a in enumerate(atoms) if a in ("B", "N")]
+    h_indices = [i for i, a in enumerate(atoms) if a == "H"]
+
+    centroid = coords[bn_indices].mean(axis=0)
+
+    h_bonds = {}
+    for hi in h_indices:
+        dists = np.linalg.norm(coords[bn_indices] - coords[hi], axis=1)
+        nearest_bn = bn_indices[np.argmin(dists)]
+        vec = coords[hi] - coords[nearest_bn]
+        h_bonds[hi] = (nearest_bn, vec)
+
+    new_coords = coords.copy()
+    for bi in bn_indices:
+        new_coords[bi] = centroid + scale * (coords[bi] - centroid)
+
+    for hi, (bn_idx, vec) in h_bonds.items():
+        new_coords[hi] = new_coords[bn_idx] + vec
+
+    lines = []
+    for a, c in zip(atoms, new_coords):
+        lines.append(f"{a:2s} {c[0]:14.8f} {c[1]:14.8f} {c[2]:14.8f}")
+    return "\n".join(lines)
+
+
 def compute_active_space(
     basis: str = "6-31g(d,p)",
     n_active_electrons: int = 2,
     n_active_orbitals: int = 2,
     orbital_method: str = "rhf",
+    scale: float = 1.0,
+    orbital_selection: str = "canonical",
     mf=None,
     hf_energy: float = None
 ) -> tuple[dict, object]:
@@ -55,10 +98,10 @@ def compute_active_space(
     Returns:
         (data_dict, mf): cache dictionary and mean-field object for reuse.
     """
-    from pyscf import gto, scf, mcscf, ao2mo, dft
+    from pyscf import gto, scf, mcscf, ao2mo, dft, mp
 
     mol = gto.Mole()
-    mol.atom = GEOMETRY_STR
+    mol.atom = get_scaled_geometry(scale)
     mol.basis = basis
     mol.charge = 0
     mol.spin = 0
@@ -162,6 +205,8 @@ def compute_active_space(
         "reference_determinant_energy": reference_determinant_energy,
         "casci_energy": e_casci,
         "correlation_energy_mHa": e_corr_mHa,
+        "scale": scale,
+        "orbital_selection": orbital_selection,
         "h1_active": h1e_active.tolist(),
         "h2_active": eri_active.tolist(),
         "mo_energies": mf.mo_energy.tolist()[:10],
