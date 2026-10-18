@@ -167,7 +167,7 @@ def run_all_verifications() -> pd.DataFrame:
     # Check 5: Ansatz Zero-Parameter Reproduction & Parameter Counts
     # -------------------------------------------------------------
     ansatze = get_ansatz_dict()
-    param_expectations = {"DexcG": 1, "PCU2": 14, "UCCSD": 3, "k-UpCCGSD": 9}
+    param_expectations = {"DexcG": 1, "PCU2": 14, "UCCSD": 3, "UCCSD-SA": 2, "k-UpCCGSD": 9}
     for name, qc in ansatze.items():
         actual_p = qc.num_parameters
         expected_p = param_expectations[name]

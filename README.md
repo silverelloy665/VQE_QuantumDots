@@ -66,23 +66,30 @@ The full $B_8N_8H_{10}$ molecule possesses 106 electrons ($o = 53$ occupied spat
 
 ## 📐 Benchmark Factorial Grid ($4 \times 4 \times 4 = 64$ Configurations)
 
-### 1. Ansätze (4)
-1. **DexcG**: UCC with double excitation operators (`excitations='d'`, 1 variational parameter).
-2. **PCU2**: Custom `ParticleConservingU2` with 2 layers preserving particle number $\eta=2$ (14 variational parameters).
-3. **UCCSD**: Unitary Coupled Cluster with Singles and Doubles (`excitations='sd'`, 3 variational parameters).
-4. **k-UpCCGSD**: Generalized UCC with $k=3$ repetitions (`generalized=True`, `reps=3`, 9 variational parameters).
+### 1. Ansätze (5 Variants Evaluated)
+1. **DexcG**: UCC with double excitation operators (`excitations='d'`, 1 variational parameter). Floor: $0.000213\text{ mHa}$ due to missing $|0110\rangle, |1001\rangle$ single excitations.
+2. **PCU2**: Particle-conserving ansatz with 2 layers using spin-preserving Givens rotations ($XX+YY$) and double-excitation coupling (14 variational parameters). Strictly maintains $100\%$ weight in the $(N_\alpha=1, N_\beta=1)$ physical sector.
+3. **UCCSD**: Unitary Coupled Cluster with Singles and Doubles (`excitations='sd'`, 3 variational parameters). Reaches $< 10^{-10}\text{ Ha}$ error from all starts.
+4. **UCCSD-SA**: Spin-adapted UCCSD with tied singles $\theta_{s\alpha} = \theta_{s\beta}$ (2 variational parameters). Reaches $0.000000\text{ mHa}$ error.
+5. **k-UpCCGSD**: Unitary Pair Coupled Cluster with Generalized Singles and Doubles ($k=3$ repetitions, 9 variational parameters).
+   > [!NOTE]
+   > **Redundancy Note**: For the $(2e, 2o)$ active space, generalized doubles are identical to standard doubles (only 1 spatial pair), so $k$-UpCCGSD repeats the exact same 3 unitary generators as UCCSD 3 times.
 
 ### 2. Parameter Initializations (4)
 1. **Zero**: $\boldsymbol{\theta}_0 = \mathbf{0}$ (corresponds exactly to the Hartree-Fock state for UCC ansätze).
 2. **Half**: $\boldsymbol{\theta}_0 = 0.5 \cdot \mathbf{1}$.
 3. **One**: $\boldsymbol{\theta}_0 = 1.0 \cdot \mathbf{1}$.
-4. **Random**: $\boldsymbol{\theta}_0 \sim \mathcal{U}(0, 1)$ with fixed seed $42$.
+4. **Random**: $\boldsymbol{\theta}_0 \sim \mathcal{U}(0, 2\pi)$ with specified seed.
 
-### 3. Classical Optimizers (4)
-1. **GD**: Gradient Descent ($\text{lr}=0.05$).
+### 3. Classical Optimizers
+1. **GD**: Gradient Descent ($\text{lr}=0.05, \text{momentum}=0.0$).
 2. **ADAM**: Adaptive Moment Estimation ($\text{lr}=0.05, \beta_1=0.9, \beta_2=0.999$).
 3. **SPSA**: Simultaneous Perturbation Stochastic Approximation ($\text{lr}=0.1, c=0.1$).
 4. **QNSPSA**: Quantum Natural SPSA with state fidelity quantum metric tensor ($\text{lr}=0.1, c=0.1$).
+5. **Reference / Fast Solvers**:
+   - **COBYLA**: Gradient-free classical reference.
+   - **L-BFGS-B**: Quasi-Newton optimizer with exact batched finite-difference gradients.
+   - **Rotosolve**: Analytic single-parameter solver for DexcG (converges to exact minimum in 4 evaluations).
 
 ---
 
@@ -213,7 +220,18 @@ $$\theta \in [-0.10, -0.05, 0.00, +0.05, +0.10]\text{ radians}$$
 > **Physical Energy Landscape Verification**:
 > The physical Heron QPU reproduces the expected variational energy minimum at $\theta \approx 0.00 - 0.05\text{ rad}$. The unmitigated physical hardware noise shifts the landscape upward by $\sim 127\text{ mHa}$ across 42 entangling CZ gates ($\sim 3\text{ mHa}$ error per CZ gate), completely validating genuine quantum circuit execution without trivial state collapse.
 
-*(Historical reference: Job [`daor3p5r85ps73ffmvn0`](https://quantum.ibm.com/jobs/daor3p5r85ps73ffmvn0) evaluated UCCSD at $\boldsymbol{\theta}=\mathbf{0}$, collapsing to depth 1 and 0 2Q gates with energy $-639.72364609\text{ Ha}$ and error $0.6371\text{ mHa}$.)*
+> [!IMPORTANT]
+> **Hardware Fallback Policy & Error Mitigation**:
+> - `src/hardware.py` strictly returns `{"Status": "NOT RUN", "reason": ...}` if live QPU execution fails, is queued, or times out. All fabricated fallback estimates (`exact + 0.00178`, etc.) are completely eliminated.
+> - The 27 Pauli terms of the active Hamiltonian are grouped into **9 qubit-wise commuting (QWC)** groups via greedy graph coloring (`group_paulis_qwc`), reducing measurement overhead.
+> - `scripts/run_live_hardware_job.py` generates a comprehensive batch specification (`data/hardware_job_spec.json`) with 9 prepared jobs across 3 resilience modes (Dynamical Decoupling, Pauli Twirling, ZNE) targeting `ibm_marrakesh` (prepared for execution, NOT submitted).
+
+---
+
+## 🔒 Security & Git Hygiene
+
+- **Credential Safety**: Private API tokens (`.env`) are strictly ignored via `.gitignore` and are not committed.
+- **Verification**: Running `git ls-files | grep .env` verifies that only the template `.env.example` is tracked.
 
 ---
 
@@ -221,13 +239,14 @@ $$\theta \in [-0.10, -0.05, 0.00, +0.05, +0.10]\text{ radians}$$
 
 ```
 VQE_QuantumDots/
+├── Makefile                          # Standard build & test automation
 ├── BN_QuantumDot_VQE_Benchmark.ipynb # Executed interactive Jupyter Notebook
 ├── results.xlsx                      # Comprehensive 7-sheet workbook with native charts
 ├── README.md                         # Benchmark report and findings
 ├── CHANGELOG.md                      # Audit of fixes and improvements
 ├── generate_notebook.py              # Notebook builder script
 ├── run_benchmark.py                  # Headless benchmark runner
-├── run_live_hardware_job.py          # Real IBM Quantum hardware job launcher
+├── requirements.txt                  # Pinned dependencies
 ├── .env.example                      # IBM Quantum token template
 ├── data/
 │   ├── bn_dot_631gdp.json            # 6-31G(d,p) (2e,2o) integrals & CASCI reference
@@ -235,7 +254,7 @@ VQE_QuantumDots/
 │   ├── bn_dot_631gdp_6e6o.json       # 6-31G(d,p) (6e,6o) integrals & CASCI reference
 │   ├── bn_dot_631gdp_b3lyp.json      # 6-31G(d,p) B3LYP integrals & CASCI reference
 │   ├── bn_dot_sto3g.json             # STO-3G (2e,2o) integrals & CASCI reference
-│   ├── benchmark_results_6-31gd_p.json # Full 64-run benchmark metrics & trajectories
+│   ├── hardware_job_spec.json        # 9-job prepared hardware batch specification
 │   ├── lr_sweep_results.json         # 24-point learning rate tuning sweep data
 │   └── robustness_results.json       # 80-run 5-seed robustness benchmark data
 ├── figures/
@@ -244,19 +263,23 @@ VQE_QuantumDots/
 │   ├── circuit_UCCSD.png             # Decomposed circuit diagram (UCCSD)
 │   ├── circuit_k-UpCCGSD.png         # Decomposed circuit diagram (k-UpCCGSD)
 │   └── benchmark_overview.png        # 4-panel overview comparison chart
+├── scripts/
+│   ├── 00_verify_baseline.py         # Baseline verification script (9 verified facts)
+│   ├── run_active_space_benchmarks.py# Multi-active-space benchmarks
+│   └── run_live_hardware_job.py      # Batch hardware job preparer
 ├── src/
-│   ├── __init__.py
+│   ├── __init__.py                   # Package exports
 │   ├── config.py                     # IBM Quantum credentials & service loader
 │   ├── molecule.py                   # Geometry, active spaces, and exact solver
 │   ├── compute_pyscf.py              # PySCF electron integral driver
-│   ├── ansatze.py                    # 4 Ansatz generators and circuit transpiler
-│   ├── optimizers.py                 # Vectorized central finite-difference optimizers
-│   ├── benchmark.py                  # Full 64-run grid executor & sweeps
-│   ├── hardware.py                   # Calibrated FakeFez noisy Aer runner & binding test
+│   ├── ansatze.py                    # 5 Ansatz generators and circuit transpiler
+│   ├── optimizers.py                 # Vectorized gradients, GD, ADAM, SPSA, COBYLA, L-BFGS-B, Rotosolve
+│   ├── benchmark.py                  # Full grid executor & sweeps
+│   ├── hardware.py                   # IBM QPU runner & QWC grouping
 │   └── excel_export.py               # openpyxl 7-sheet workbook & chart exporter
 └── tests/
     ├── conftest.py
-    ├── run_verification_suite.py     # Verification runner for Excel export
+    ├── run_verification_suite.py     # Comprehensive automated verification suite
     ├── test_ansatze.py               # Parameter count and HF reproduction tests
     ├── test_b3lyp_active_space.py    # DFT orbital active space tests
     ├── test_conservation.py          # Particle number & Sz conservation tests
@@ -269,27 +292,26 @@ VQE_QuantumDots/
 
 ---
 
-## 📗 Excel Workbook Specification (`results.xlsx`)
-
-The generated `results.xlsx` workbook contains **7 formatted sheets** with zero fabricated numbers:
-1. **`Config`**: Metadata, active space definition, software environment versions, and LR sweep results.
-2. **`Results`**: Full 64-configuration table with % correlation recovered, evaluation counts, and 3-color conditional formatting.
-3. **`Convergence`**: Complete 51-point ($t=0 \dots 50$) energy trajectories for all 64 configurations.
-4. **`Summary`**: Best per ansatz, top configurations with multi-tier tie ranking, optimizer overview, circuit metrics, and 4 native Excel charts.
-5. **`Robustness`**: 5-seed random initialization statistics (mean, std, min, max, % correlation).
-6. **`Hardware`**: Calibrated FakeFez noisy Aer simulation (4096 shots) and parameter binding analysis.
-7. **`Verification`**: Automated verification test suite results with PASS/FAIL status.
-
----
-
 ## 🧪 Verification & Testing
 
-Run the automated test suite across all 8 modules (15 unit tests):
+Run the automated test suite (24 unit tests):
 ```bash
-pytest -v tests/
+make test
+# or: pytest -q tests/
 ```
 
-All 15 tests pass deterministically.
+Run baseline fact verification:
+```bash
+make verify
+# or: python scripts/00_verify_baseline.py
+```
+
+Run comprehensive verification suite:
+```bash
+python tests/run_verification_suite.py
+```
+
+All 24 pytest unit tests and all 18 verification checks pass deterministically.
 
 ---
 
@@ -303,5 +325,11 @@ python -m jupyter nbconvert --to notebook --execute --inplace BN_QuantumDot_VQE_
 
 ### 2. Run Headless Benchmark
 ```bash
-python run_benchmark.py
+make benchmark
+# or: python run_benchmark.py
+```
+
+### 3. Prepare Batch Hardware Jobs (No Submission)
+```bash
+python scripts/run_live_hardware_job.py
 ```
