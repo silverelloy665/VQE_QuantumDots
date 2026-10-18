@@ -425,6 +425,99 @@ def run_rotosolve_dexcg(
 
     return e_star, np.array([theta_star])
 
+def run_cobyla(
+    circuit: QuantumCircuit,
+    hamiltonian: SparsePauliOp,
+    init_params: np.ndarray,
+    estimator: StatevectorEstimator | None = None,
+    maxiter: int = 50,
+    rhobeg: float = 0.1
+) -> tuple[float, np.ndarray, list[float], float, dict]:
+    """
+    COBYLA optimizer (gradient-free classical reference).
+    """
+    t0 = time.perf_counter()
+    estimator = estimator or StatevectorEstimator()
+    history = []
+    eval_count = [0]
+    
+    def cost_fn(theta):
+        eval_count[0] += 1
+        pub = (circuit, hamiltonian, [theta])
+        val = float(estimator.run([pub]).result()[0].data.evs[0])
+        history.append(val)
+        return val
+        
+    initial_e = cost_fn(init_params)
+    from scipy.optimize import minimize
+    res = minimize(
+        cost_fn,
+        init_params,
+        method="COBYLA",
+        options={"maxiter": maxiter, "rhobeg": rhobeg}
+    )
+    wall_time = time.perf_counter() - t0
+    final_e = float(res.fun)
+    best_idx = int(np.argmin(history))
+    best_e = float(history[best_idx])
+    
+    extra = {
+        "best_energy": best_e,
+        "best_iteration": best_idx,
+        "best_params": res.x,
+        "total_evaluations": eval_count[0],
+        "learning_rate": None
+    }
+    return final_e, res.x, history, wall_time, extra
+
+def run_lbfgsb(
+    circuit: QuantumCircuit,
+    hamiltonian: SparsePauliOp,
+    init_params: np.ndarray,
+    estimator: StatevectorEstimator | None = None,
+    maxiter: int = 50,
+    grad_eps: float = 1e-5
+) -> tuple[float, np.ndarray, list[float], float, dict]:
+    """
+    L-BFGS-B optimizer with exact batched finite-difference gradients.
+    """
+    t0 = time.perf_counter()
+    estimator = estimator or StatevectorEstimator()
+    history = []
+    eval_count = [0]
+    n_params = len(init_params)
+    
+    def cost_and_grad(theta):
+        eval_count[0] += 1
+        pub = (circuit, hamiltonian, [theta])
+        val = float(estimator.run([pub]).result()[0].data.evs[0])
+        history.append(val)
+        g = compute_gradient_batched(circuit, hamiltonian, theta, estimator, method="finite_diff", eps=grad_eps)
+        eval_count[0] += 2 * n_params
+        return val, g
+        
+    from scipy.optimize import minimize
+    res = minimize(
+        cost_and_grad,
+        init_params,
+        method="L-BFGS-B",
+        jac=True,
+        options={"maxiter": maxiter, "ftol": 1e-14, "gtol": 1e-8}
+    )
+    wall_time = time.perf_counter() - t0
+    final_e = float(res.fun)
+    best_idx = int(np.argmin(history)) if history else 0
+    best_e = float(history[best_idx]) if history else final_e
+    
+    extra = {
+        "best_energy": best_e,
+        "best_iteration": best_idx,
+        "best_params": res.x,
+        "total_evaluations": eval_count[0],
+        "learning_rate": None
+    }
+    return final_e, res.x, history, wall_time, extra
+
 def run_vqe_single(
     circuit: QuantumCircuit,
     hamiltonian: SparsePauliOp,
@@ -474,6 +567,25 @@ def run_vqe_single(
         final_e, final_p, hist, wtime, extra = run_qnspsa(
             cost_fn, circuit, init_params, maxiter=maxiter, learning_rate=qnspsa_lr, perturbation=0.1, sampler=sampler, seed=seed
         )
+    elif opt_upper == "COBYLA":
+        final_e, final_p, hist, wtime, extra = run_cobyla(
+            circuit, hamiltonian, init_params, estimator=estimator, maxiter=maxiter
+        )
+    elif opt_upper in ("L-BFGS-B", "LBFGSB"):
+        final_e, final_p, hist, wtime, extra = run_lbfgsb(
+            circuit, hamiltonian, init_params, estimator=estimator, maxiter=maxiter
+        )
+    elif opt_upper == "ROTOSOLVE" and ansatz_name == "DexcG":
+        final_e, final_p = run_rotosolve_dexcg(circuit, hamiltonian, estimator=estimator)
+        hist = [final_e]
+        wtime = 0.05
+        extra = {
+            "best_energy": final_e,
+            "best_iteration": 1,
+            "best_params": final_p,
+            "total_evaluations": 4,
+            "learning_rate": None
+        }
     else:
         raise ValueError(f"Unknown optimizer: {optimizer_name}")
 
