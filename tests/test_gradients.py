@@ -22,22 +22,17 @@ def setup_hamiltonian_and_ansatze():
 def test_gradient_accuracy_across_ansatze(setup_hamiltonian_and_ansatze):
     H, E_exact, meta, ansatze, estimator = setup_hamiltonian_and_ansatze
     
-    # Test points: zero, half, and 3 fixed random seeds
-    seeds = [42, 123, 999]
+    # Test points: 5 fixed random seeds for each ansatz
+    seeds = [0, 1, 2, 3, 42]
     eps = 1e-5
     
     for name, qc in ansatze.items():
         n_params = qc.num_parameters
-        test_points = [
-            ("zero", np.zeros(n_params)),
-            ("half", np.full(n_params, 0.5)),
-        ]
         for s in seeds:
             rng = np.random.RandomState(s)
-            test_points.append((f"random_seed_{s}", rng.uniform(0.0, 1.0, n_params)))
+            pt = rng.uniform(0.0, 2.0 * np.pi, n_params)
             
-        for pt_name, pt in test_points:
-            # Batched gradient
+            # Batched gradient (default: finite_diff)
             g_batched = compute_gradient_batched(qc, H, pt, estimator, method="finite_diff", eps=eps)
             
             # Independent single-point finite difference calculation
@@ -53,7 +48,25 @@ def test_gradient_accuracy_across_ansatze(setup_hamiltonian_and_ansatze):
                 g_indep[i] = (e_plus - e_minus) / (2.0 * eps)
                 
             max_diff = np.max(np.abs(g_batched - g_indep))
-            assert max_diff < 1e-4, f"Gradient mismatch for {name} at {pt_name}: max diff = {max_diff:.2e}"
+            assert max_diff < 1e-6, f"Gradient mismatch for {name} at seed {s}: max diff = {max_diff:.2e}"
+
+def test_dexg_gradient_at_zero(setup_hamiltonian_and_ansatze):
+    H, E_exact, meta, ansatze, estimator = setup_hamiltonian_and_ansatze
+    qc = ansatze["DexcG"]
+    th0 = np.zeros(qc.num_parameters)
+    g = compute_gradient_batched(qc, H, th0, estimator, method="finite_diff", eps=1e-5)
+    assert abs(g[0] - 0.0126) < 1e-4, f"DexcG gradient at 0 is {g[0]:.6f}, expected 0.0126 +/- 1e-4"
+
+def test_param_shift_pi4_dexcg(setup_hamiltonian_and_ansatze):
+    H, E_exact, meta, ansatze, estimator = setup_hamiltonian_and_ansatze
+    qc = ansatze["DexcG"]
+    eps = 1e-5
+    for s in [0, 1, 2, 3, 42]:
+        rng = np.random.RandomState(s)
+        pt = rng.uniform(0.0, 2.0 * np.pi, qc.num_parameters)
+        g_fd = compute_gradient_batched(qc, H, pt, estimator, method="finite_diff", eps=eps)
+        g_ps = compute_gradient_batched(qc, H, pt, estimator, method="param_shift_pi4")
+        assert np.max(np.abs(g_fd - g_ps)) < 1e-6, f"param_shift_pi4 mismatch on DexcG at seed {s}: {np.max(np.abs(g_fd - g_ps)):.2e}"
 
 def test_gradient_descent_monotonic_decrease_dexcg(setup_hamiltonian_and_ansatze):
     H, E_exact, meta, ansatze, estimator = setup_hamiltonian_and_ansatze
