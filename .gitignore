@@ -37,7 +37,8 @@ env/
 # Output & Logs
 logs/
 results/
-data/
 *.log
-!data/*.json
+.pytest_cache/
+archive/
+
 

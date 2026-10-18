@@ -1,0 +1,162 @@
+[
+  {
+    "Ansatz": "DexcG",
+    "Optimizer": "GD",
+    "Seeds_Count": 5,
+    "Mean_Error_mHa": 0.011924812065444712,
+    "Std_Error_mHa": 0.009693626521649323,
+    "Min_Error_mHa": 0.002513435674700304,
+    "Max_Error_mHa": 0.025750122517820273,
+    "Mean_Pct_Corr": 70.86581296160085
+  },
+  {
+    "Ansatz": "DexcG",
+    "Optimizer": "ADAM",
+    "Seeds_Count": 5,
+    "Mean_Error_mHa": 0.6940475248029543,
+    "Std_Error_mHa": 0.6592767405138784,
+    "Min_Error_mHa": 0.001613215999896056,
+    "Max_Error_mHa": 1.7414333688066108,
+    "Mean_Pct_Corr": -1595.6670084337434
+  },
+  {
+    "Ansatz": "DexcG",
+    "Optimizer": "SPSA",
+    "Seeds_Count": 5,
+    "Mean_Error_mHa": 0.0002134820761057199,
+    "Std_Error_mHa": 1.3002578686126931e-07,
+    "Min_Error_mHa": 0.0002133571115336963,
+    "Max_Error_mHa": 0.0002136689545295667,
+    "Mean_Pct_Corr": 99.47842978988048
+  },
+  {
+    "Ansatz": "DexcG",
+    "Optimizer": "QNSPSA",
+    "Seeds_Count": 5,
+    "Mean_Error_mHa": 0.00021345485947676934,
+    "Std_Error_mHa": 1.1088681967297752e-07,
+    "Min_Error_mHa": 0.0002133376710844459,
+    "Max_Error_mHa": 0.00021365076463553123,
+    "Mean_Pct_Corr": 99.47849628437567
+  },
+  {
+    "Ansatz": "PCU2",
+    "Optimizer": "GD",
+    "Seeds_Count": 5,
+    "Mean_Error_mHa": 53.70689109633986,
+    "Std_Error_mHa": 13.655198828158778,
+    "Min_Error_mHa": 40.522732691556484,
+    "Max_Error_mHa": 78.60445593132681,
+    "Mean_Pct_Corr": -131114.3622779473
+  },
+  {
+    "Ansatz": "PCU2",
+    "Optimizer": "ADAM",
+    "Seeds_Count": 5,
+    "Mean_Error_mHa": 0.1682330009771249,
+    "Std_Error_mHa": 0.0617005406529414,
+    "Min_Error_mHa": 0.11630843562215887,
+    "Max_Error_mHa": 0.2667122622597162,
+    "Mean_Pct_Corr": -311.01961939523096
+  },
+  {
+    "Ansatz": "PCU2",
+    "Optimizer": "SPSA",
+    "Seeds_Count": 5,
+    "Mean_Error_mHa": 24.69349248913204,
+    "Std_Error_mHa": 7.576322704303433,
+    "Min_Error_mHa": 12.623626293020607,
+    "Max_Error_mHa": 36.10734076266908,
+    "Mean_Pct_Corr": -60230.07689021788
+  },
+  {
+    "Ansatz": "PCU2",
+    "Optimizer": "QNSPSA",
+    "Seeds_Count": 5,
+    "Mean_Error_mHa": 3.407907976156821,
+    "Std_Error_mHa": 2.482769475383408,
+    "Min_Error_mHa": 0.0711331025513573,
+    "Max_Error_mHa": 7.798572139108728,
+    "Mean_Pct_Corr": -8226.053932096282
+  },
+  {
+    "Ansatz": "UCCSD",
+    "Optimizer": "GD",
+    "Seeds_Count": 5,
+    "Mean_Error_mHa": 43.21756684514639,
+    "Std_Error_mHa": 50.307632653683534,
+    "Min_Error_mHa": 0.8385822133050169,
+    "Max_Error_mHa": 115.53572848617932,
+    "Mean_Pct_Corr": -105487.29721700291
+  },
+  {
+    "Ansatz": "UCCSD",
+    "Optimizer": "ADAM",
+    "Seeds_Count": 5,
+    "Mean_Error_mHa": 4.0234928629843125,
+    "Std_Error_mHa": 2.8528071508333017,
+    "Min_Error_mHa": 0.9121743551077088,
+    "Max_Error_mHa": 7.684635908276505,
+    "Mean_Pct_Corr": -9730.024404118567
+  },
+  {
+    "Ansatz": "UCCSD",
+    "Optimizer": "SPSA",
+    "Seeds_Count": 5,
+    "Mean_Error_mHa": 2.4377585654747236,
+    "Std_Error_mHa": 2.956994342319194,
+    "Min_Error_mHa": 0.029304912345651246,
+    "Max_Error_mHa": 7.519012454622498,
+    "Mean_Pct_Corr": -5855.826692380797
+  },
+  {
+    "Ansatz": "UCCSD",
+    "Optimizer": "QNSPSA",
+    "Seeds_Count": 5,
+    "Mean_Error_mHa": 46.109078359017985,
+    "Std_Error_mHa": 80.51452569961184,
+    "Min_Error_mHa": 0.0024731094754315563,
+    "Max_Error_mHa": 206.53915058062466,
+    "Mean_Pct_Corr": -112551.71356222418
+  },
+  {
+    "Ansatz": "k-UpCCGSD",
+    "Optimizer": "GD",
+    "Seeds_Count": 5,
+    "Mean_Error_mHa": 14.849228176603901,
+    "Std_Error_mHa": 27.700735185306765,
+    "Min_Error_mHa": 0.0625730170895622,
+    "Max_Error_mHa": 70.20920597210534,
+    "Mean_Pct_Corr": -36178.994477965476
+  },
+  {
+    "Ansatz": "k-UpCCGSD",
+    "Optimizer": "ADAM",
+    "Seeds_Count": 5,
+    "Mean_Error_mHa": 1.2700551662419457,
+    "Std_Error_mHa": 0.8453700713899731,
+    "Min_Error_mHa": 0.5060273887238509,
+    "Max_Error_mHa": 2.920162314353547,
+    "Mean_Pct_Corr": -3002.94405977274
+  },
+  {
+    "Ansatz": "k-UpCCGSD",
+    "Optimizer": "SPSA",
+    "Seeds_Count": 5,
+    "Mean_Error_mHa": 3.1571021287390977,
+    "Std_Error_mHa": 3.1922046744415504,
+    "Min_Error_mHa": 0.3854961013303182,
+    "Max_Error_mHa": 7.9418025210316046,
+    "Mean_Pct_Corr": -7613.29589206258
+  },
+  {
+    "Ansatz": "k-UpCCGSD",
+    "Optimizer": "QNSPSA",
+    "Seeds_Count": 5,
+    "Mean_Error_mHa": 5.50396630785599,
+    "Std_Error_mHa": 5.345320948559686,
+    "Min_Error_mHa": 0.2632690708423979,
+    "Max_Error_mHa": 13.568972461143858,
+    "Mean_Pct_Corr": -13347.053336026185
+  }
+]

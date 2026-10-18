@@ -7,4 +7,24 @@ numpy>=2.0.0
 scipy>=1.15.0
 matplotlib>=3.10.0
 python-dotenv>=1.0.0
+# Core Quantum Computing Stack (Qiskit 2.x)
+qiskit==2.3.1
+qiskit-aer==0.17.2
+qiskit-ibm-runtime==0.45.1
+qiskit-algorithms==0.4.0
+qiskit-nature==0.8.0
 
+# Scientific & Numerical Stack
+numpy==2.4.3
+scipy==1.17.1
+matplotlib==3.10.8
+pandas==3.0.1
+openpyxl==3.1.5
+xlsxwriter==3.2.9
+python-dotenv==1.2.2
+
+# Testing & Verification
+pytest==9.1.1
+
+# Note: PySCF (pyscf>=2.7.0) is executed in the Linux/WSL environment
+# as PySCF does not provide native Windows wheels.

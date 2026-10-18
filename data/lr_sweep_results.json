@@ -1,0 +1,194 @@
+[
+  {
+    "Optimizer": "GD",
+    "Learning_Rate": 0.005,
+    "Final_Energy_Ha": -639.5693289792407,
+    "Error_mHa": 154.95424793732582,
+    "Total_Evaluations": 76,
+    "Wall_Time_s": 0.9396135000006325
+  },
+  {
+    "Optimizer": "GD",
+    "Learning_Rate": 0.01,
+    "Final_Energy_Ha": -639.6234519384366,
+    "Error_mHa": 100.83128874146041,
+    "Total_Evaluations": 76,
+    "Wall_Time_s": 0.982515799999419
+  },
+  {
+    "Optimizer": "GD",
+    "Learning_Rate": 0.02,
+    "Final_Energy_Ha": -639.6846116223984,
+    "Error_mHa": 39.67160477964171,
+    "Total_Evaluations": 76,
+    "Wall_Time_s": 0.8968998000000283
+  },
+  {
+    "Optimizer": "GD",
+    "Learning_Rate": 0.05,
+    "Final_Energy_Ha": -639.7224729260299,
+    "Error_mHa": 1.8103011481116482,
+    "Total_Evaluations": 76,
+    "Wall_Time_s": 0.7643611999992572
+  },
+  {
+    "Optimizer": "GD",
+    "Learning_Rate": 0.1,
+    "Final_Energy_Ha": -639.7242768976284,
+    "Error_mHa": 0.006329549592010153,
+    "Total_Evaluations": 76,
+    "Wall_Time_s": 0.8339642999999342
+  },
+  {
+    "Optimizer": "GD",
+    "Learning_Rate": 0.5,
+    "Final_Energy_Ha": -639.7242830138499,
+    "Error_mHa": 0.00021332812139007729,
+    "Total_Evaluations": 76,
+    "Wall_Time_s": 0.532436499999676
+  },
+  {
+    "Optimizer": "ADAM",
+    "Learning_Rate": 0.005,
+    "Final_Energy_Ha": -639.587716550504,
+    "Error_mHa": 136.56667667407874,
+    "Total_Evaluations": 76,
+    "Wall_Time_s": 0.8137651000006372
+  },
+  {
+    "Optimizer": "ADAM",
+    "Learning_Rate": 0.01,
+    "Final_Energy_Ha": -639.6571530608397,
+    "Error_mHa": 67.13016633830193,
+    "Total_Evaluations": 76,
+    "Wall_Time_s": 0.8522030000003724
+  },
+  {
+    "Optimizer": "ADAM",
+    "Learning_Rate": 0.02,
+    "Final_Energy_Ha": -639.7207298925017,
+    "Error_mHa": 3.5533346763259033,
+    "Total_Evaluations": 76,
+    "Wall_Time_s": 0.49416310000015073
+  },
+  {
+    "Optimizer": "ADAM",
+    "Learning_Rate": 0.05,
+    "Final_Energy_Ha": -639.7175533173516,
+    "Error_mHa": 6.729909826390212,
+    "Total_Evaluations": 76,
+    "Wall_Time_s": 0.48560040000029403
+  },
+  {
+    "Optimizer": "ADAM",
+    "Learning_Rate": 0.1,
+    "Final_Energy_Ha": -639.7154834965155,
+    "Error_mHa": 8.799730662531147,
+    "Total_Evaluations": 76,
+    "Wall_Time_s": 0.42863260000012815
+  },
+  {
+    "Optimizer": "ADAM",
+    "Learning_Rate": 0.5,
+    "Final_Energy_Ha": -639.7157628399781,
+    "Error_mHa": 8.520387199951074,
+    "Total_Evaluations": 76,
+    "Wall_Time_s": 0.4443258999999671
+  },
+  {
+    "Optimizer": "SPSA",
+    "Learning_Rate": 0.005,
+    "Final_Energy_Ha": -639.5689021573859,
+    "Error_mHa": 155.38106979215627,
+    "Total_Evaluations": 78,
+    "Wall_Time_s": 0.5174867999994603
+  },
+  {
+    "Optimizer": "SPSA",
+    "Learning_Rate": 0.01,
+    "Final_Energy_Ha": -639.6228541935074,
+    "Error_mHa": 101.42903367068357,
+    "Total_Evaluations": 78,
+    "Wall_Time_s": 0.5327256999999008
+  },
+  {
+    "Optimizer": "SPSA",
+    "Learning_Rate": 0.02,
+    "Final_Energy_Ha": -639.6840969658766,
+    "Error_mHa": 40.18626130141456,
+    "Total_Evaluations": 78,
+    "Wall_Time_s": 0.4915118999997503
+  },
+  {
+    "Optimizer": "SPSA",
+    "Learning_Rate": 0.05,
+    "Final_Energy_Ha": -639.7224071173824,
+    "Error_mHa": 1.8761097956030426,
+    "Total_Evaluations": 78,
+    "Wall_Time_s": 0.48405840000032185
+  },
+  {
+    "Optimizer": "SPSA",
+    "Learning_Rate": 0.1,
+    "Final_Energy_Ha": -639.724276387185,
+    "Error_mHa": 0.006839993034191139,
+    "Total_Evaluations": 78,
+    "Wall_Time_s": 0.6566570000004504
+  },
+  {
+    "Optimizer": "SPSA",
+    "Learning_Rate": 0.5,
+    "Final_Energy_Ha": -639.7242830138503,
+    "Error_mHa": 0.00021332778032956412,
+    "Total_Evaluations": 78,
+    "Wall_Time_s": 0.5759561999993821
+  },
+  {
+    "Optimizer": "QNSPSA",
+    "Learning_Rate": 0.005,
+    "Final_Energy_Ha": -639.5694282852678,
+    "Error_mHa": 154.85494191023008,
+    "Total_Evaluations": 104,
+    "Wall_Time_s": 2.806749299999865
+  },
+  {
+    "Optimizer": "QNSPSA",
+    "Learning_Rate": 0.01,
+    "Final_Energy_Ha": -639.6221460126608,
+    "Error_mHa": 102.13721451725633,
+    "Total_Evaluations": 104,
+    "Wall_Time_s": 2.622400999999627
+  },
+  {
+    "Optimizer": "QNSPSA",
+    "Learning_Rate": 0.02,
+    "Final_Energy_Ha": -639.684989106107,
+    "Error_mHa": 39.294121071066,
+    "Total_Evaluations": 104,
+    "Wall_Time_s": 2.4324655999998868
+  },
+  {
+    "Optimizer": "QNSPSA",
+    "Learning_Rate": 0.05,
+    "Final_Energy_Ha": -639.7220493130656,
+    "Error_mHa": 2.2339141124803064,
+    "Total_Evaluations": 104,
+    "Wall_Time_s": 2.5933955000000424
+  },
+  {
+    "Optimizer": "QNSPSA",
+    "Learning_Rate": 0.1,
+    "Final_Energy_Ha": -639.7242788398157,
+    "Error_mHa": 0.00438736230989889,
+    "Total_Evaluations": 104,
+    "Wall_Time_s": 2.4806156000004194
+  },
+  {
+    "Optimizer": "QNSPSA",
+    "Learning_Rate": 0.5,
+    "Final_Energy_Ha": -639.7242830138501,
+    "Error_mHa": 0.00021332789401640184,
+    "Total_Evaluations": 104,
+    "Wall_Time_s": 2.431553000000349
+  }
+]

@@ -1,0 +1,58 @@
+{
+  "status": "COMPLETED_ON_PHYSICAL_QPU",
+  "backend": "ibm_fez",
+  "job_id": "daqph1uekp0c73ar40l0",
+  "job_dashboard": "https://quantum.ibm.com/jobs/daqph1uekp0c73ar40l0",
+  "ansatz": "PCU2",
+  "transpiled_depth": 56,
+  "transpiled_2q_gates": 18,
+  "shots_per_point": 4096,
+  "total_points": 5,
+  "total_shots": 20480,
+  "resilience_level": 0,
+  "quantum_seconds_billed": 50.0,
+  "wall_duration_seconds": 65.9207022190094,
+  "timestamp_utc": "2026-09-24T21:40:23.821621+00:00",
+  "landscape_comparison": [
+    {
+      "point_index": 1,
+      "label": "theta_0 = -0.100 (displaced)",
+      "ideal_energy_ha": -639.724242296512,
+      "noisy_qpu_energy_ha": -639.6934113794631,
+      "error_mha": 30.830917048888296,
+      "std_dev_ha": 0.0016383982896425097
+    },
+    {
+      "point_index": 2,
+      "label": "theta_0 = -0.050 (displaced)",
+      "ideal_energy_ha": -639.7242422965121,
+      "noisy_qpu_energy_ha": -639.6951972857621,
+      "error_mha": 29.045010749996436,
+      "std_dev_ha": 0.0016220550430481606
+    },
+    {
+      "point_index": 3,
+      "label": "theta_0 = +0.000 (HF Ref, zeros)",
+      "ideal_energy_ha": -639.724242296512,
+      "noisy_qpu_energy_ha": -639.6939549952303,
+      "error_mha": 30.28730128164625,
+      "std_dev_ha": 0.0016079809893465714
+    },
+    {
+      "point_index": 4,
+      "label": "theta_0 = +0.050 (displaced)",
+      "ideal_energy_ha": -639.724242296512,
+      "noisy_qpu_energy_ha": -639.6964229498001,
+      "error_mha": 27.81934671190811,
+      "std_dev_ha": 0.001599312704660885
+    },
+    {
+      "point_index": 5,
+      "label": "theta_0 = +0.100 (displaced)",
+      "ideal_energy_ha": -639.724242296512,
+      "noisy_qpu_energy_ha": -639.6927483500383,
+      "error_mha": 31.493946473688084,
+      "std_dev_ha": 0.0016348025350252599
+    }
+  ]
+}
