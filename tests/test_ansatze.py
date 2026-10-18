@@ -23,6 +23,7 @@ def test_parameter_counts_match_theory(setup_data):
         "DexcG": 1,
         "PCU2": 14,
         "UCCSD": 3,
+        "UCCSD-SA": 2,
         "k-UpCCGSD": 9
     }
     for name, expected_n in expected_counts.items():

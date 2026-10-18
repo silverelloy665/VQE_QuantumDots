@@ -86,25 +86,43 @@ def build_particle_conserving_u2(
         
     return qc
 
+def generate_upccgsd_excitations(num_spatial_orbitals: int, num_particles: tuple[int, int]):
+    """
+    Generates paired doubles + generalized singles excitations for UpCCGSD.
+    Generic in (num_spatial_orbitals, num_particles).
+    
+    Generates:
+      1. Generalized singles (all p < q for alpha and beta spins)
+      2. Paired doubles (p_alpha p_beta -> q_alpha q_beta for all spatial pairs p < q)
+    """
+    n_so = num_spatial_orbitals
+    excitations = []
+    # 1. Generalized singles (all pairs p < q for alpha and beta)
+    for p in range(n_so):
+        for q in range(p + 1, n_so):
+            excitations.append(((p,), (q,)))                  # alpha spin
+            excitations.append(((p + n_so,), (q + n_so,)))    # beta spin
+    # 2. Paired doubles (p_alpha p_beta -> q_alpha q_beta for all p < q)
+    for p in range(n_so):
+        for q in range(p + 1, n_so):
+            excitations.append(((p, p + n_so), (q, q + n_so)))
+    return excitations
+
 def get_ansatz_dict(
     num_spatial_orbitals: int = 2,
     num_particles: tuple[int, int] = (1, 1),
     k_reps: int = 3,
-    pcu2_reps: int = 2
+    pcu2_reps: int = 2,
+    include_sa: bool = True
 ) -> dict[str, QuantumCircuit]:
     """
-    Returns the dictionary of the 4 benchmark ansätze:
-    - DexcG: UCC with excitations='d'
-    - PCU2: ParticleConservingU2 (2 reps)
-    - PCU2: ParticleConservingU2 (reps=pcu2_reps)
-    - UCCSD: UCC with excitations='sd'
-    - k-UpCCGSD: UCC with excitations='sd', generalized=True, reps=k (k=3)
+    Returns the dictionary of benchmark ansätze:
     - DexcG: UCC with excitations='d' (1 parameter for 2e/2o)
-    - PCU2: ParticleConservingU2 (reps=2, 14 parameters for 2e/2o)
-    - UCCSD: UCC with excitations='sd' (3 parameters for 2e/2o)
-    - k-UpCCGSD: Generalized UCC with excitations='sd', generalized=True, reps=k (k=3, 9 parameters for 2e/2o).
-    - k-UpCCGSD: Generalized UCC with excitations='sd', generalized=True, reps=k_reps.
-      Note: This is a generalized unitary coupled cluster ansatz with k repetitions and is not pair-restricted.
+    - PCU2: ParticleConservingU2 with genuine Givens rotations and double excitation layer (14 params for 2e/2o)
+    - UCCSD: Standard UCC singles and doubles (3 parameters for 2e/2o)
+    - UCCSD-SA: Spin-adapted UCCSD with tied single excitations theta_alpha = theta_beta (2 parameters for 2e/2o)
+    - k-UpCCGSD: Generic UpCCGSD with paired doubles + generalized singles, reps=k (9 parameters for 2e/2o, k=3).
+      Note: For (2e, 2o), k-UpCCGSD is strictly redundant with UCCSD as generalized singles/doubles coincide with UCCSD.
     """
     mapper = JordanWignerMapper()
     hf_state = HartreeFock(num_spatial_orbitals, num_particles, mapper)
@@ -134,22 +152,91 @@ def get_ansatz_dict(
     )
     uccsd.name = "UCCSD"
     
+    # Generic UpCCGSD with paired doubles + generalized singles
     kupccgsd = UCC(
         num_spatial_orbitals=num_spatial_orbitals,
         num_particles=num_particles,
-        excitations="sd",
-        generalized=True,
-        reps=k_reps,
+        excitations=generate_upccgsd_excitations,
         qubit_mapper=mapper,
-        initial_state=hf_state
+        initial_state=hf_state,
+        reps=k_reps
     )
     kupccgsd.name = "k-UpCCGSD"
     
-    return {
+    # Attach redundancy metadata for 2e,2o space
+    is_2e2o = (num_spatial_orbitals == 2 and num_particles == (1, 1))
+    setattr(kupccgsd, "redundant_with_uccsd", is_2e2o)
+    
+    ansatze = {
         "DexcG": dexcg,
         "PCU2": pcu2,
         "UCCSD": uccsd,
-        "k-UpCCGSD": kupccgsd
+    }
+    
+    if include_sa and is_2e2o:
+        # Spin-adapted UCCSD (theta_alpha = theta_beta tied) -> 2 parameters
+        theta_sa = ParameterVector("theta_SA", 2)
+        uccsd_sa = uccsd.assign_parameters({
+            uccsd.parameters[0]: theta_sa[0],
+            uccsd.parameters[1]: theta_sa[0],
+            uccsd.parameters[2]: theta_sa[1]
+        })
+        uccsd_sa.name = "UCCSD-SA"
+        ansatze["UCCSD-SA"] = uccsd_sa
+        
+    ansatze["k-UpCCGSD"] = kupccgsd
+    return ansatze
+
+def evaluate_parity_mapper_reduction(basis: str = "6-31g(d,p)") -> dict:
+    """
+    Evaluates ParityMapper with 2-qubit reduction for the (2e, 2o) active space.
+    Compares spectrum with CASCI exact ground state and counts resulting CNOT/qubit metrics.
+    """
+    import json
+    from qiskit_nature.second_q.mappers import ParityMapper
+    from qiskit_nature.second_q.hamiltonians import ElectronicEnergy
+    from src.molecule import DATA_DIR
+    
+    clean_basis = "631gdp" if "6-31g" in basis.lower() else "sto3g"
+    cache_path = DATA_DIR / f"bn_dot_{clean_basis}.json"
+    with open(cache_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+        
+    h1 = np.array(data["h1_active"])
+    h2 = np.array(data["h2_active"])
+    h2_phys = np.einsum("pqrs->prqs", h2)
+    ee = ElectronicEnergy.from_raw_integrals(h1, h2_phys)
+    ferm_op = ee.second_q_op()
+    
+    parity_mapper = ParityMapper(num_particles=(1, 1))
+    qubit_op_parity = parity_mapper.map(ferm_op)
+    
+    evals, _ = np.linalg.eigh(qubit_op_parity.to_matrix())
+    e_core = float(data.get("e_core", data.get("inactive_energy")))
+    ground_parity = float(evals[0]) + e_core
+    casci_exact = float(data["casci_energy"])
+    
+    spectrum_matches = np.isclose(ground_parity, casci_exact, atol=1e-6)
+    
+    hf_parity = HartreeFock(2, (1, 1), parity_mapper)
+    dexcg_p = UCC(2, (1, 1), "d", parity_mapper, initial_state=hf_parity).decompose().decompose()
+    uccsd_p = UCC(2, (1, 1), "sd", parity_mapper, initial_state=hf_parity).decompose().decompose()
+    
+    cnot_dexcg = dict(dexcg_p.count_ops()).get("cx", 0)
+    cnot_uccsd = dict(uccsd_p.count_ops()).get("cx", 0)
+    
+    return {
+        "parity_num_qubits": qubit_op_parity.num_qubits,
+        "parity_pauli_terms": len(qubit_op_parity),
+        "parity_ground_energy": ground_parity,
+        "casci_exact_energy": casci_exact,
+        "spectrum_matches": spectrum_matches,
+        "difference_Ha": abs(ground_parity - casci_exact),
+        "dexcg_parity_cnot": cnot_dexcg,
+        "dexcg_parity_depth": dexcg_p.depth(),
+        "uccsd_parity_cnot": cnot_uccsd,
+        "uccsd_parity_depth": uccsd_p.depth(),
+        "status": "SPECTRUM VERIFIED MATCH" if spectrum_matches else "SPECTRUM MISMATCH (NOT ADOPTED)"
     }
 
 def analyze_and_render_circuits(
