@@ -253,14 +253,17 @@ def analyze_and_render_circuits(
         ansatze_dict = get_ansatz_dict()
         
     if backend is None:
-        backend = GenericBackendV2(num_qubits=5)
+        try:
+            from src.config import get_runtime_service
+            service = get_runtime_service()
+            backend = service.backend("ibm_fez")
+        except Exception:
+            backend = GenericBackendV2(num_qubits=156, basis_gates=["ecr", "id", "rz", "sx", "x"])
         
-    pm = generate_preset_pass_manager(backend=backend, optimization_level=2)
-    pm = generate_preset_pass_manager(backend=backend, optimization_level=3)
     records = []
+    seeds = [0, 1, 2, 42, 100]
     
     for name, qc in ansatze_dict.items():
-        # Decompose 2-3 levels so elementary gates (CNOT, RZ, RX, etc.) are visible
         # Decompose 2 levels so elementary gates (CNOT, RZ, RX, etc.) are visible
         decomposed = qc.decompose()
         if any(op.name in ["PauliEvolution", "HartreeFock"] for op in decomposed.data):
@@ -277,11 +280,32 @@ def analyze_and_render_circuits(
             fig.savefig(fig_path, bbox_inches="tight", dpi=300)
             plt.close(fig)
             
-        # Transpilation analysis
-        # Transpilation analysis (unbound symbolic parameters)
-        transpiled = pm.run(decomposed)
-        t_ops = transpiled.count_ops()
-        t_2q_gates = sum(count for op, count in t_ops.items() if op in ["cx", "ecr", "cz"])
+        # Transpilation analysis across multiple transpiler seeds to minimize 2Q gate count
+        best_tqc = None
+        best_2q = float("inf")
+        best_seed = seeds[0]
+        
+        for s in seeds:
+            try:
+                pm = generate_preset_pass_manager(backend=backend, optimization_level=3, seed_transpiler=s)
+                tqc = pm.run(decomposed)
+                ops_s = tqc.count_ops()
+                n2q_s = sum(count for op, count in ops_s.items() if op in ["cx", "ecr", "cz"])
+                if n2q_s < best_2q:
+                    best_2q = n2q_s
+                    best_seed = s
+                    best_tqc = tqc
+            except Exception:
+                continue
+                
+        if best_tqc is None:
+            pm = generate_preset_pass_manager(backend=backend, optimization_level=3)
+            best_tqc = pm.run(decomposed)
+            ops_s = best_tqc.count_ops()
+            best_2q = sum(count for op, count in ops_s.items() if op in ["cx", "ecr", "cz"])
+            best_seed = 0
+            
+        t_ops = best_tqc.count_ops()
         
         records.append({
             "Ansatz": name,
@@ -289,8 +313,10 @@ def analyze_and_render_circuits(
             "Raw Depth": decomposed.depth(),
             "Raw 1-Qubit Gates": num_1q_gates_raw,
             "Raw 2-Qubit Gates": num_2q_gates_raw,
-            "Transpiled Depth": transpiled.depth(),
-            "Transpiled 2-Qubit Gates": t_2q_gates,
+            "Transpiled Depth": best_tqc.depth(),
+            "Transpiled 2-Qubit Gates": best_2q,
+            "Best_Transpiled_2Q_Gates": best_2q,
+            "Transpiler_Seed": best_seed,
             "Transpiled Total Gates": sum(t_ops.values())
         })
         

@@ -1,0 +1,197 @@
+[
+  {
+    "circuit_name": "HF_baseline",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "dynamical_decoupling",
+    "optimization_level": 3,
+    "seed_transpiler": 42,
+    "2Q_gates": 0,
+    "depth": 1,
+    "parameters": [
+      0.0
+    ],
+    "options": {
+      "dynamical_decoupling": {
+        "enable": true,
+        "sequence_type": "XX"
+      }
+    },
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "circuit_name": "HF_baseline",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "pauli_twirling",
+    "optimization_level": 3,
+    "seed_transpiler": 42,
+    "2Q_gates": 0,
+    "depth": 1,
+    "parameters": [
+      0.0
+    ],
+    "options": {
+      "twirling": {
+        "enable_gates": true,
+        "enable_measure": true
+      }
+    },
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "circuit_name": "HF_baseline",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "zne",
+    "optimization_level": 3,
+    "seed_transpiler": 42,
+    "2Q_gates": 0,
+    "depth": 1,
+    "parameters": [
+      0.0
+    ],
+    "options": {
+      "resilience": {
+        "measure_mitigation": true,
+        "zne_mitigation": true,
+        "zne": {
+          "extrapolator": "exponential"
+        }
+      }
+    },
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "circuit_name": "DexcG_optimal",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "dynamical_decoupling",
+    "optimization_level": 3,
+    "seed_transpiler": 42,
+    "2Q_gates": 42,
+    "depth": 133,
+    "parameters": [
+      3.135136419216959
+    ],
+    "options": {
+      "dynamical_decoupling": {
+        "enable": true,
+        "sequence_type": "XX"
+      }
+    },
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "circuit_name": "DexcG_optimal",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "pauli_twirling",
+    "optimization_level": 3,
+    "seed_transpiler": 42,
+    "2Q_gates": 42,
+    "depth": 133,
+    "parameters": [
+      3.135136419216959
+    ],
+    "options": {
+      "twirling": {
+        "enable_gates": true,
+        "enable_measure": true
+      }
+    },
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "circuit_name": "DexcG_optimal",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "zne",
+    "optimization_level": 3,
+    "seed_transpiler": 42,
+    "2Q_gates": 42,
+    "depth": 133,
+    "parameters": [
+      3.135136419216959
+    ],
+    "options": {
+      "resilience": {
+        "measure_mitigation": true,
+        "zne_mitigation": true,
+        "zne": {
+          "extrapolator": "exponential"
+        }
+      }
+    },
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "circuit_name": "UCCSD_optimal",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "dynamical_decoupling",
+    "optimization_level": 3,
+    "seed_transpiler": 42,
+    "2Q_gates": 45,
+    "depth": 140,
+    "parameters": [
+      -0.0005197858348154271,
+      -0.0005197447391935333,
+      -0.006490465435870467
+    ],
+    "options": {
+      "dynamical_decoupling": {
+        "enable": true,
+        "sequence_type": "XX"
+      }
+    },
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "circuit_name": "UCCSD_optimal",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "pauli_twirling",
+    "optimization_level": 3,
+    "seed_transpiler": 42,
+    "2Q_gates": 45,
+    "depth": 140,
+    "parameters": [
+      -0.0005197858348154271,
+      -0.0005197447391935333,
+      -0.006490465435870467
+    ],
+    "options": {
+      "twirling": {
+        "enable_gates": true,
+        "enable_measure": true
+      }
+    },
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "circuit_name": "UCCSD_optimal",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "zne",
+    "optimization_level": 3,
+    "seed_transpiler": 42,
+    "2Q_gates": 45,
+    "depth": 140,
+    "parameters": [
+      -0.0005197858348154271,
+      -0.0005197447391935333,
+      -0.006490465435870467
+    ],
+    "options": {
+      "resilience": {
+        "measure_mitigation": true,
+        "zne_mitigation": true,
+        "zne": {
+          "extrapolator": "exponential"
+        }
+      }
+    },
+    "status": "PREPARED (NOT SUBMITTED)"
+  }
+]
