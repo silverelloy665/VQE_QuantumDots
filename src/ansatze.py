@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from scipy.sparse import SparseEfficiencyWarning
 
+import qiskit
 from qiskit.circuit import QuantumCircuit, ParameterVector
 from qiskit_nature.second_q.circuit.library import HartreeFock, UCC
 from qiskit_nature.second_q.mappers import JordanWignerMapper
@@ -253,12 +254,8 @@ def analyze_and_render_circuits(
         ansatze_dict = get_ansatz_dict()
         
     if backend is None:
-        try:
-            from src.config import get_runtime_service
-            service = get_runtime_service()
-            backend = service.backend("ibm_fez")
-        except Exception:
-            backend = GenericBackendV2(num_qubits=156, basis_gates=["ecr", "id", "rz", "sx", "x"])
+        from src.config import get_target_backend
+        backend = get_target_backend()
         
     records = []
     seeds = [0, 1, 2, 42, 100]
@@ -317,6 +314,8 @@ def analyze_and_render_circuits(
             "Transpiled 2-Qubit Gates": best_2q,
             "Best_Transpiled_2Q_Gates": best_2q,
             "Transpiler_Seed": best_seed,
+            "Target_Backend": getattr(backend, "name", "unknown"),
+            "Qiskit_Version": qiskit.__version__,
             "Transpiled Total Gates": sum(t_ops.values())
         })
         

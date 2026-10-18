@@ -119,11 +119,11 @@ def load_or_build_bn_dot_hamiltonian(
     full_qubit_hamiltonian = (active_qubit_op + id_op).simplify()
     
     e_corr_mHa = abs(hf_energy - casci_energy) * 1000.0
-    e_corr_mHa = abs(reference_determinant_energy - casci_energy) * 1000.0
-    if e_corr_mHa < 1.0:
+    TOO_EASY_THRESHOLD_MHA = 5.0
+    if e_corr_mHa < TOO_EASY_THRESHOLD_MHA:
         warnings.warn(
             f"Active space ({n_active_electrons}e, {n_active_orbitals}o) has small correlation energy "
-            f"E_corr = {e_corr_mHa:.4f} mHa (< 1.0 mHa). Zero-initialization starts within {e_corr_mHa:.4f} mHa "
+            f"E_corr = {e_corr_mHa:.4f} mHa (< {TOO_EASY_THRESHOLD_MHA:.1f} mHa). Zero-initialization starts within {e_corr_mHa:.4f} mHa "
             f"of exact reference.",
             UserWarning
         )

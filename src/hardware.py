@@ -13,9 +13,9 @@ from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_ibm_runtime import QiskitRuntimeService, EstimatorV2
 
-from src.config import get_runtime_service
+from src.config import get_runtime_service, DEFAULT_HARDWARE_BACKEND
 
-_DEFAULT_BACKEND = "ibm_marrakesh"
+_DEFAULT_BACKEND = DEFAULT_HARDWARE_BACKEND
 _JOB_TIMEOUT_S = 220
 
 

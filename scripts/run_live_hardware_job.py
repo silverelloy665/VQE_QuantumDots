@@ -20,7 +20,7 @@ from qiskit.providers.fake_provider import GenericBackendV2
 from src.molecule import load_or_build_bn_dot_hamiltonian
 from src.ansatze import get_ansatz_dict
 from src.optimizers import run_rotosolve_dexcg, run_lbfgsb
-from src.config import get_runtime_service
+from src.config import get_runtime_service, DEFAULT_HARDWARE_BACKEND
 
 DATA_DIR = REPO_ROOT / "data"
 
@@ -66,7 +66,7 @@ def get_optimal_parameters(ansatze, hamiltonian, exact_energy):
 
 
 def prepare_hardware_job_specs(
-    backend_name: str = "ibm_marrakesh",
+    backend_name: str = DEFAULT_HARDWARE_BACKEND,
     shots: int = 8192,
     seed_transpiler: int = 42
 ) -> pd.DataFrame:

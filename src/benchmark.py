@@ -177,7 +177,8 @@ def run_full_vqe_benchmark(
     ref_det_energy = meta.get("reference_determinant_energy", hf_energy)
     delta_corr = abs(ref_det_energy - exact_energy)
     gap_mHa = delta_corr * 1000.0
-    is_too_easy = (gap_mHa < 1.0)
+    TOO_EASY_THRESHOLD_MHA = 5.0
+    is_too_easy = (gap_mHa < TOO_EASY_THRESHOLD_MHA)
     meta["hf_casci_gap_mHa"] = gap_mHa
     meta["is_too_easy"] = is_too_easy
     
@@ -231,7 +232,7 @@ def run_full_vqe_benchmark(
     total_runs = len(ansatz_names) * len(init_names) * len(optimizer_names)
     run_idx = 0
     
-    tag = f" [GAP={gap_mHa:.4f} mHa: {'TOO EASY (<1 mHa)' if is_too_easy else 'MEANINGFUL (>1 mHa)'}]"
+    tag = f" [GAP={gap_mHa:.4f} mHa: {'TOO EASY (<5 mHa)' if is_too_easy else 'HARD (>=5 mHa)'}]"
     
     if verbose:
         print("==========================================================================")

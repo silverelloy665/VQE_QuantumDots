@@ -1,0 +1,6 @@
+Job_ID,Backend,Shots,Ansatz,Parameters,Resilience,Measured_Energy_Ha,Error_vs_CASCI_mHa,Error_vs_HF_mHa,Source
+d330j9cve01c738t02j0,ibm_fez (historical),unknown,unknown (historical VQE),unknown,unknown,-639.64524323,79.04,78.9991,README / CHANGELOG (historical citation)
+dbahr3hgv2cc73e6stt0,ibm_marrakesh,8192,UCCSD / DexcG,optimal (from benchmark),unmitigated (resilience_level=0),-639.65177323,72.51,72.4691,git commit 2f94b2d log
+daor3p5r85ps73ffmvn0,ibm_fez,4096,UCCSD,theta = 0.0 (HF state),"unmitigated (opt level 3, collapsed to depth 1)",-639.72364609,0.6371,0.5962,"data/qpu_ledger.json, README"
+daqkle3t55cs738rsfrg,ibm_fez,4096,DexcG (5-pt sweep),"theta in [-0.10, +0.10] rad",unmitigated (42 CZ gates),-639.59691169,127.3715,127.3306,"data/qpu_ledger.json, README"
+daqph1uekp0c73ar40l0,ibm_fez,4096,PCU2 (5-pt sweep),"theta in [-0.10, +0.10] rad",unmitigated (18 CZ gates),-639.69642295,27.8193,27.7784,data/hardware_run.json
