@@ -98,9 +98,10 @@ def test_hard_problem_gradient_accuracy():
     as required by Phase C2.
     """
     from src.molecule import load_hard_hamiltonian
+    from src.optimizers import FastStatevectorEstimator
     H, _, _ = load_hard_hamiltonian()
     ansatze = get_ansatz_dict(4, (2, 2), include_k_variants=True)
-    estimator = StatevectorEstimator()
+    estimator = FastStatevectorEstimator(H)
     seeds = [0, 1, 2, 3, 42]
     eps = 1e-5
 
