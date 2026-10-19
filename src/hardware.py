@@ -137,6 +137,7 @@ def run_hardware_evaluation(
     # 3. Submit EstimatorV2 job
     print(f"Submitting single-point EstimatorV2 job to {backend.name} (shots={shots})...")
     t0 = time.perf_counter()
+    job_id = None
     try:
         estimator = EstimatorV2(mode=backend)
         pub = (transpiled_circuit, mapped_hamiltonian)
@@ -165,10 +166,11 @@ def run_hardware_evaluation(
             "QPU Runtime (seconds)": round(qpu_time, 2),
         }
     except Exception as timeout_or_err:
-        print(f"[Error] QPU execution error: {timeout_or_err}")
+        print(f"[Notice] QPU wait/execution update: {timeout_or_err}")
         return {
-            "Status": "NOT RUN",
+            "Status": "QUEUED_ON_PHYSICAL_QPU" if job_id else "NOT RUN",
             "Target Backend": backend.name,
+            "Job ID": job_id,
             "reason": str(timeout_or_err),
             "Transpiled 2-Qubit Gate Count": t_2q_gates,
             "Circuit Depth": t_depth

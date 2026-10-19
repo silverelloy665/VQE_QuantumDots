@@ -4,3 +4,4 @@ dbahr3hgv2cc73e6stt0,ibm_marrakesh,8192,UCCSD / DexcG,optimal (from benchmark),u
 daor3p5r85ps73ffmvn0,ibm_fez,4096,UCCSD,theta = 0.0 (HF state),"unmitigated (opt level 3, collapsed to depth 1)",-639.72364609,0.6371,0.5962,"data/qpu_ledger.json, README"
 daqkle3t55cs738rsfrg,ibm_fez,4096,DexcG (5-pt sweep),"theta in [-0.10, +0.10] rad",unmitigated (42 CZ gates),-639.59691169,127.3715,127.3306,"data/qpu_ledger.json, README"
 daqph1uekp0c73ar40l0,ibm_fez,4096,PCU2 (5-pt sweep),"theta in [-0.10, +0.10] rad",unmitigated (18 CZ gates),-639.69642295,27.8193,27.7784,data/hardware_run.json
+dbb3cupgv2cc73e7n6f0,ibm_fez,8192,UCCSD,theta = 0.0 (HF state),"unmitigated (opt level 3, depth 1)",-639.72300486,1.2784,1.2374,"data/hardware_crosscheck_fez.json, live QPU crosscheck"

@@ -1,0 +1,18 @@
+{
+  "status": "COMPLETED_ON_PHYSICAL_QPU",
+  "backend": "ibm_fez",
+  "job_id": "dbb3cupgv2cc73e7n6f0",
+  "job_url": "https://quantum.ibm.com/jobs/dbb3cupgv2cc73e7n6f0",
+  "shots": 8192,
+  "transpiled_cz_gates": 0,
+  "transpiled_depth": 1,
+  "exact_casci_ha": -639.7242832271774,
+  "marrakesh_comparison_job": "dbahr3hgv2cc73e6stt0",
+  "marrakesh_measured_ha": -639.65177323,
+  "marrakesh_error_mha": 72.51,
+  "timestamp_utc": "2026-10-19T15:25:47Z",
+  "measured_energy_ha": -639.7230048648636,
+  "error_mha": 1.2783623137693212,
+  "wall_time_seconds": 51.39,
+  "fez_vs_marrakesh_delta_mha": -71.2316
+}
