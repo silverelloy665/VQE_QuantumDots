@@ -1,13 +1,24 @@
-.PHONY: all verify test benchmark
+.PHONY: all verify test benchmark hard hardware-prep clean
 
 all: verify test
 
 verify:
-	python scripts/00_verify_baseline.py
+	python -m pytest tests/ -q
+	python scripts/10_verify_audit.py
 
 test:
 	python -m pytest tests/ -q
 
+hard:
+	python scripts/scan_active_spaces.py
+	python scripts/run_hard_benchmark.py
+	python scripts/analyze_circuit_costs_hard.py
+
+hardware-prep:
+	python scripts/run_live_hardware_job.py --dry-run
+
 benchmark:
 	python run_benchmark.py
 
+clean:
+	python -c "import shutil, glob; [shutil.rmtree(p, ignore_errors=True) for p in glob.glob('**/__pycache__', recursive=True)]"

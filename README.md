@@ -333,3 +333,170 @@ make benchmark
 ```bash
 python scripts/run_live_hardware_job.py
 ```
+
+---
+
+# 🚀 Round 2: Genuinely Hard Quantum Dot Benchmark (8 Qubits, 4e4o)
+
+Following the initial audit which revealed that equilibrium $B_8N_8H_{10}$ active spaces have near-Hartree-Fock correlation gaps ($E_{corr} = 0.0409\text{ mHa} < 1.6\text{ mHa}$), **Round 2** constructs a genuinely hard benchmark satisfying $E_{corr} \ge 5.0\text{ mHa}$ with $\le 12$ qubits.
+
+### 1. Phase A Audit Verification & Hardware Source of Truth
+
+- **Target Backend Single Source of Truth**: Pinned `DEFAULT_HARDWARE_BACKEND = "ibm_marrakesh"` (IBM Quantum Heron r2, 156 qubits, Qiskit 2.3.1) in `src/config.py`.
+- **Secrets Hygiene**: Git history verification (`git log --all --oneline -- .env`) confirms `.env` was **NEVER** committed. Only `.env.example` is tracked, and `.env` is ignored by `.gitignore`.
+- **Historical Job Reconciliation**: All 5 physical QPU jobs from repository history reconciled in `data/reconciled_hardware_jobs.csv`:
+
+| Job ID | Backend | Shots | Ansatz | Parameters | Resilience | Measured Energy (Ha) | Error vs CASCI (mHa) | Error vs HF (mHa) | Source |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `d330j9cve01c738t02j0` | ibm_fez (historical) | unknown | unknown (historical VQE) | unknown | unknown | -639.64524323 | 79.0400 | 78.9991 | README / CHANGELOG (historical citation) |
+| `dbahr3hgv2cc73e6stt0` | ibm_marrakesh | 8192 | UCCSD / DexcG | optimal (from benchmark) | unmitigated (resilience_level=0) | -639.65177323 | 72.5100 | 72.4691 | git commit 2f94b2d log |
+| `daor3p5r85ps73ffmvn0` | ibm_fez | 4096 | UCCSD | theta = 0.0 (HF state) | unmitigated (opt level 3, collapsed to depth 1) | -639.72364609 | 0.6371 | 0.5962 | data/qpu_ledger.json, README |
+| `daqkle3t55cs738rsfrg` | ibm_fez | 4096 | DexcG (5-pt sweep) | theta in [-0.10, +0.10] rad | unmitigated (42 CZ gates) | -639.59691169 | 127.3715 | 127.3306 | data/qpu_ledger.json, README |
+| `daqph1uekp0c73ar40l0` | ibm_fez | 4096 | PCU2 (5-pt sweep) | theta in [-0.10, +0.10] rad | unmitigated (18 CZ gates) | -639.69642295 | 27.8193 | 27.7784 | data/hardware_run.json |
+
+- **Uniform Evaluation Counting**: Central finite differences cost $2N$ energy evaluations per gradient step ($M \times (2N + 1)$ function evaluations per run).
+
+---
+
+### 2. Phase B: Active Space Scan & Hard Problem Definition
+
+Radial B-N bond scaling $s \in \{1.0, 1.2, 1.4, 1.6, 1.8\}$ scanned across $(2e,2o)$, $(4e,4o)$, and $(6e,6o)$ active spaces while fixing B-H ($1.19\text{ Å}$) and N-H ($1.01\text{ Å}$) bond lengths:
+
+| Scale | Active Space | Qubits | Reference Determinant (Ha) | Exact CASCI (Ha) | Correlation Gap (mHa) | RHF Stable | Orbital Selection |
+| :---: | :---: | :---: | :--- | :--- | :--- | :---: | :---: |
+| 1.0 | (2e, 2o) | 4 | -639.72424230 | -639.72428323 | 0.0409 | True | canonical |
+| 1.0 | (2e, 2o) | 4 | -639.72424230 | -639.72449431 | 0.2520 | True | natural_orbitals |
+| 1.0 | (4e, 4o) | 8 | -639.72424230 | -639.72453605 | 0.2938 | True | canonical |
+| 1.0 | (4e, 4o) | 8 | -639.72424230 | -639.72522555 | 0.9833 | True | natural_orbitals |
+| 1.0 | (6e, 6o) | 12 | -639.72424230 | -639.72562598 | 1.3837 | True | canonical |
+| 1.0 | (6e, 6o) | 12 | -639.72424230 | -639.73117816 | 6.9359 | True | natural_orbitals |
+| 1.2 | (2e, 2o) | 4 | -638.90434877 | -638.90437946 | 0.0307 | True | canonical |
+| 1.2 | (2e, 2o) | 4 | -638.90434877 | -638.90435740 | 0.0086 | True | natural_orbitals |
+| 1.2 | (4e, 4o) | 8 | -638.90434877 | -638.90453245 | 0.1837 | True | canonical |
+| 1.2 | (4e, 4o) | 8 | -638.90434877 | -638.90437398 | 0.0252 | True | natural_orbitals |
+| 1.2 | (6e, 6o) | 12 | -638.90434877 | -638.90516676 | 0.8180 | True | canonical |
+| 1.2 | (6e, 6o) | 12 | -638.90434877 | -638.91182793 | 7.4792 | True | natural_orbitals |
+| 1.4 | (2e, 2o) | 4 | -637.57319627 | -637.57321966 | 0.0234 | True | canonical |
+| 1.4 | (2e, 2o) | 4 | -637.57319627 | -637.57505471 | 1.8584 | True | natural_orbitals |
+| 1.4 | (4e, 4o) | 8 | -637.57319627 | -637.57327018 | 0.0739 | True | canonical |
+| 1.4 | (4e, 4o) | 8 | -637.57319627 | -637.58133543 | 8.1392 | True | natural_orbitals |
+| 1.4 | (6e, 6o) | 12 | -637.57319627 | -637.57341122 | 0.2149 | True | canonical |
+| 1.4 | (6e, 6o) | 12 | -637.57319627 | -637.59216279 | 18.9665 | True | natural_orbitals |
+| 1.6 | (2e, 2o) | 4 | -636.44255772 | -636.44284626 | 0.2885 | True | canonical |
+| 1.6 | (2e, 2o) | 4 | -636.44255772 | -636.44587091 | 3.3132 | True | natural_orbitals |
+| 1.6 | (4e, 4o) | 8 | -636.44255772 | -636.44876870 | 6.2110 | True | canonical |
+| 1.6 | (4e, 4o) | 8 | -636.44255772 | -636.46744957 | 24.8919 | True | natural_orbitals |
+| 1.6 | (6e, 6o) | 12 | -636.44255772 | -636.46015833 | 17.6006 | True | canonical |
+| 1.6 | (6e, 6o) | 12 | -636.44255772 | -636.49330148 | 50.7438 | True | natural_orbitals |
+| 1.8 | (2e, 2o) | 4 | -635.90740374 | -636.05761934 | 150.2156 | False | canonical |
+| 1.8 | (2e, 2o) | 4 | -635.77111653 | -636.07409389 | 302.9774 | False | natural_orbitals |
+| 1.8 | (4e, 4o) | 8 | -635.90740374 | -636.05790392 | 150.5002 | False | canonical |
+| 1.8 | (4e, 4o) | 8 | -635.77111653 | -636.07710825 | 305.9917 | False | natural_orbitals |
+| 1.8 | (6e, 6o) | 12 | -635.90740374 | -636.06717679 | 159.7731 | False | canonical |
+| 1.8 | (6e, 6o) | 12 | -635.77111653 | -636.13843883 | 367.3223 | False | natural_orbitals |
+| 1.0 | (8e, 8o) | 16 | SKIPPED | SKIPPED | SKIPPED (>12q) | nan | nan |
+| 1.2 | (8e, 8o) | 16 | SKIPPED | SKIPPED | SKIPPED (>12q) | nan | nan |
+| 1.4 | (8e, 8o) | 16 | SKIPPED | SKIPPED | SKIPPED (>12q) | nan | nan |
+| 1.6 | (8e, 8o) | 16 | SKIPPED | SKIPPED | SKIPPED (>12q) | nan | nan |
+| 1.8 | (8e, 8o) | 16 | SKIPPED | SKIPPED | SKIPPED (>12q) | nan | nan |
+
+
+> [!IMPORTANT]
+> **Chosen Hard Benchmark Definition**:
+> - **Geometry**: Radial B-N bond scale $s = 1.4$ ($r_{\text{BN}} = 2.02\text{ Å}$, fixed B-H $1.19\text{ Å}$, N-H $1.01\text{ Å}$)
+> - **Active Space**: $(4e, 4o)$ with MP2 natural orbitals $\to$ **8 Qubits** (Jordan-Wigner)
+> - **Reference Energy**: $E_{\text{ref}} = -637.57319627\text{ Ha}$
+> - **Exact CASCI Ground Energy**: $E_{\text{CASCI}} = -637.58133543\text{ Ha}$
+> - **Active Correlation Gap**: $\Delta E_{\text{corr}} = 8.1392\text{ mHa} \ge 5.0\text{ mHa}$
+> - **Symmetry & Fock Space Stability**: RHF is stable (`RHF_stable = True`). Unconstrained Fock space ground state lies strictly in $(N_\alpha=2, N_\beta=2)$ sector with weight $> 0.999999$ and energy diff $1.14 \times 10^{-13}\text{ Ha}$ ($< 10^{-8}\text{ Ha}$). Scale 1.8 was excluded due to RHF triplet instability ($S^2=2.0$). Scale 1.6 was excluded due to Fock space ground sector shift to $(2, 3)$.
+
+---
+
+### 3. Phase C: Hard Problem VQE Grid Results (10 Seeds)
+
+Benchmark grid across 8 ansätze $\times$ 6 optimizers $\times$ 10 random seeds ($[0 \dots 9]$) + zero inits (469 total runs, evaluated variational bound $E \ge E_{\text{CASCI}} - 10^{-9}\text{ Ha}$):
+
+| Rank | Ansatz | Optimizer | Seeds | Median Error (mHa) | IQR (mHa) | Min Error (mHa) | Mean Corr Recov (%) | Success Rate (%) | Better than HF (%) |
+| :---: | :--- | :--- | :---: | :--- | :--- | :--- | :--- | :--- | :--- |
+| **1** | **2-UpCCGSD** | L-BFGS-B | 10 | 0.8023 | 1.0704 | 0.0754 | 89.18% | 90.0% | 100.0% |
+| **2** | **1-UpCCGSD** | L-BFGS-B | 10 | 1.8925 | 0.6388 | 0.0859 | -391.67% | 30.0% | 80.0% |
+| **3** | **3-UpCCGSD** | L-BFGS-B | 10 | 2.1709 | 2.3117 | 0.9729 | 45.55% | 30.0% | 90.0% |
+| **4** | **UCCSD-SA** | L-BFGS-B | 10 | 4.3516 | 1.2302 | 3.0336 | -345.93% | 0.0% | 90.0% |
+| **5** | **UCCSD** | L-BFGS-B | 10 | 4.9527 | 0.4110 | 3.0680 | -336.59% | 0.0% | 90.0% |
+| **6** | **PCU2** | L-BFGS-B | 10 | 5.0436 | 198.4835 | 3.7528 | -989.54% | 0.0% | 70.0% |
+| **7** | **UCCSD-SA** | GD | 10 | 11.7488 | 376.8274 | 3.1466 | -2096.49% | 0.0% | 40.0% |
+| **8** | **UCCSD** | ADAM | 10 | 14.9729 | 7.6301 | 5.9784 | -102.69% | 0.0% | 10.0% |
+| **9** | **UCCSD-SA** | ADAM | 10 | 17.7722 | 14.6199 | 8.9403 | -145.51% | 0.0% | 0.0% |
+| **10** | **2-UpCCGSD** | ADAM | 10 | 17.8615 | 7.6456 | 9.4778 | -129.27% | 0.0% | 0.0% |
+
+
+#### Benchmark Insights:
+- **Winner**: **2-UpCCGSD + L-BFGS-B** achieves **90.0% success rate** ($< 1.6\text{ mHa}$ chemical accuracy), with **Median error = 0.8023 mHa**, IQR = $1.0704\text{ mHa}$, and Min error = **0.0754 mHa** (89.18% mean correlation recovered).
+- **Inversion / DexcG Failure**: DexcG completely fails on the hard problem from random initializations (0.0% success rate, median error 560.59 mHa). The Round 1 finding that "DexcG is best" does NOT survive on non-trivial active spaces.
+
+---
+
+### 4. Phase D: Circuit Cost & Calibration Fidelity on `ibm_marrakesh`
+
+Transpiled across 20 seeds (optimization level 3) on `ibm_marrakesh` (Heron r2) using live calibration data (352 CZ edges):
+
+| Ansatz | Parameters | Raw CNOT | Raw Depth | Transpiled 2Q (CZ) | Transpiled Depth | Transpiler Seed | Estimated Fidelity | Fidelity Source | Backend |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- | :---: | :--- |
+| **HF_baseline** | 0 | 0 | 1 | 0 | 1 | 0 | **1.0000** | CALIBRATION | `ibm_marrakesh` |
+| **DexcG** | 18 | 1376 | 1791 | 1362 | 4004 | 0 | **0.0770** | CALIBRATION | `ibm_marrakesh` |
+| **PCU2** | 32 | 1388 | 1826 | 1374 | 4002 | 0 | **0.0751** | CALIBRATION | `ibm_marrakesh` |
+| **UCCSD** | 26 | 1440 | 1844 | 1417 | 4073 | 0 | **0.0682** | CALIBRATION | `ibm_marrakesh` |
+| **UCCSD-SA** | 22 | 1440 | 1844 | 1417 | 4073 | 0 | **0.0682** | CALIBRATION | `ibm_marrakesh` |
+| **1-UpCCGSD** | 18 | 496 | 618 | 489 | 1347 | 0 | **0.4056** | CALIBRATION | `ibm_marrakesh` |
+| **2-UpCCGSD** | 36 | 992 | 1226 | 995 | 2667 | 0 | **0.1565** | CALIBRATION | `ibm_marrakesh` |
+| **3-UpCCGSD** | 54 | 1488 | 1834 | 1501 | 4010 | 0 | **0.0609** | CALIBRATION | `ibm_marrakesh` |
+
+
+- **Hardware Feasibility**: Only `HF_baseline` (1.0000) and `1-UpCCGSD` (0.4056) maintain estimated fidelity $> 0.3$. `2-UpCCGSD` (995 CZ gates, depth 2667, fidelity 0.1565) is marked **NOT RECOMMENDED: too deep**.
+- **ParityMapper Reduction**: Compresses 8 qubits to 6 qubits (325 Pauli terms), reproducing exact CASCI ground energy to $1.14 \times 10^{-13}\text{ Ha}$ (status: ADOPTED).
+
+---
+
+### 5. Phase E: Hardware Preparation (`hardware_job_spec_v2.json`)
+
+15 batch jobs prepared across 3 resilience levels (Dynamical Decoupling, Pauli Twirling, ZNE) targeting `ibm_marrakesh` (NOT submitted):
+
+| Priority | Experiment Name | Backend | Shots | Resilience | QWC Circuits | 2Q Gates | Depth | Est. Fidelity | Est. QPU Time (s) | Recommendation |
+| :---: | :--- | :--- | :---: | :--- | :---: | :---: | :---: | :--- | :---: | :--- |
+| 1 | `HF_baseline_2e2o` | `ibm_marrakesh` | 8192 | dynamical_decoupling | 9 | 0 | 1 | 1.0000 | 7.37s | RECOMMENDED: Reference baseline |
+| 1 | `HF_baseline_2e2o` | `ibm_marrakesh` | 8192 | pauli_twirling | 9 | 0 | 1 | 1.0000 | 7.37s | RECOMMENDED: Reference baseline |
+| 1 | `HF_baseline_2e2o` | `ibm_marrakesh` | 8192 | zne | 9 | 0 | 1 | 1.0000 | 7.37s | RECOMMENDED: Reference baseline |
+| 1 | `HF_baseline_hard_4e4o` | `ibm_marrakesh` | 8192 | dynamical_decoupling | 75 | 0 | 1 | 1.0000 | 61.44s | RECOMMENDED: Reference baseline |
+| 1 | `HF_baseline_hard_4e4o` | `ibm_marrakesh` | 8192 | pauli_twirling | 75 | 0 | 1 | 1.0000 | 61.44s | RECOMMENDED: Reference baseline |
+| 1 | `HF_baseline_hard_4e4o` | `ibm_marrakesh` | 8192 | zne | 75 | 0 | 1 | 1.0000 | 61.44s | RECOMMENDED: Reference baseline |
+| 2 | `original_2e2o_parity_reduced` | `ibm_marrakesh` | 8192 | dynamical_decoupling | 4 | 2 | 11 | 0.9220 | 3.28s | RECOMMENDED: Minimal 2-qubit circuit (< 1e-6 Ha match) |
+| 2 | `original_2e2o_parity_reduced` | `ibm_marrakesh` | 8192 | pauli_twirling | 4 | 2 | 11 | 0.9220 | 3.28s | RECOMMENDED: Minimal 2-qubit circuit (< 1e-6 Ha match) |
+| 2 | `original_2e2o_parity_reduced` | `ibm_marrakesh` | 8192 | zne | 4 | 2 | 11 | 0.9220 | 3.28s | RECOMMENDED: Minimal 2-qubit circuit (< 1e-6 Ha match) |
+| 3 | `hard_problem_1-UpCCGSD` | `ibm_marrakesh` | 8192 | dynamical_decoupling | 75 | 489 | 1347 | 0.4056 | 61.44s | RECOMMENDED: Meets fidelity threshold (> 0.3) |
+| 3 | `hard_problem_1-UpCCGSD` | `ibm_marrakesh` | 8192 | pauli_twirling | 75 | 489 | 1347 | 0.4056 | 61.44s | RECOMMENDED: Meets fidelity threshold (> 0.3) |
+| 3 | `hard_problem_1-UpCCGSD` | `ibm_marrakesh` | 8192 | zne | 75 | 489 | 1347 | 0.4056 | 61.44s | RECOMMENDED: Meets fidelity threshold (> 0.3) |
+| 4 | `hard_problem_2-UpCCGSD_too_deep` | `ibm_marrakesh` | 8192 | dynamical_decoupling | 75 | 995 | 2667 | 0.1565 | 61.44s | NOT RECOMMENDED: too deep (fidelity < 0.3) |
+| 4 | `hard_problem_2-UpCCGSD_too_deep` | `ibm_marrakesh` | 8192 | pauli_twirling | 75 | 995 | 2667 | 0.1565 | 61.44s | NOT RECOMMENDED: too deep (fidelity < 0.3) |
+| 4 | `hard_problem_2-UpCCGSD_too_deep` | `ibm_marrakesh` | 8192 | zne | 75 | 995 | 2667 | 0.1565 | 61.44s | NOT RECOMMENDED: too deep (fidelity < 0.3) |
+
+
+> [!TIP]
+> **Recommended Hardware Experiment**: The **2-qubit parity-reduced minimal circuit for the original 2e2o problem** (`original_2e2o_parity_reduced`) requires only **2 physical CZ gates** (depth 11) on `ibm_marrakesh`, achieves **0.9220 estimated fidelity**, groups into **4 QWC circuits** (3.28s execution time), and reproduces CASCI ground energy to **$2.13 \times 10^{-7}\text{ Ha}$** ($< 1 \times 10^{-6}\text{ Ha}$).
+
+---
+
+### 6. Makefile Targets
+
+- `make verify`: Runs full unit test suite (`pytest -q`) and executes Phase A audit verification (`scripts/10_verify_audit.py`).
+- `make hard`: Executes the full hard benchmark pipeline: active-space scan (Phase B), VQE grid (Phase C), and circuit cost analysis (Phase D).
+- `make test`: Runs pytest suite (`pytest -q`).
+- `make hardware-prep`: Prepares and validates `data/hardware_job_spec_v2.json` in dry-run mode without contacting QPU.
+
+---
+
+### 7. Known Limitations
+
+1. **Statevector Simulation Only**: All VQE trajectories evaluate exact statevector expectation values. Hardware jobs are prepared, transpiled, and verified, but physical QPU submission requires explicit authorization.
+2. **Single Geometry Family**: Explores uniform radial B-N stretching with fixed B-H and N-H bonds at planar $D_{3h}$ symmetry; out-of-plane puckering or asymmetric dissociation modes are not considered.
+3. **Frozen RHF Orbitals**: MP2 natural orbitals are generated from an initial RHF reference and remain fixed during VQE (no simultaneous orbital relaxation / CASSCF).
+4. **No Explicit Noise Model in Statevector Simulation**: Circuit fidelities are estimated analytically via calibrated gate error products $\prod(1 - e_{2q})$ rather than density matrix simulations with Kraus operators.
