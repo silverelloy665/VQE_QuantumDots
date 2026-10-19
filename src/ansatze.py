@@ -32,24 +32,30 @@ def build_particle_conserving_u2(
 ) -> QuantumCircuit:
     """
     Constructs the genuinely Particle- and Sz-conserving U2 ansatz (ParticleConservingU2):
-    - Hartree-Fock reference state (|0101> for 2e, 2o)
+    - Hartree-Fock reference state
     - For each layer (reps):
         - RZ rotation on every qubit (preserves particle number on every individual qubit)
-        - Spin-aware Givens rotations (XX+YY) on orbital pairs within the alpha and beta sectors:
-            - alpha pair (0, 1) preserves N_alpha = 1
-            - beta pair (2, 3) preserves N_beta = 1
-        - Double-excitation block between alpha and beta sectors, preserving both N=2 and Sz=0
-          (enables variational access to the ground state beyond product-state correlation)
+        - Spin-aware Givens rotations (XX+YY) on adjacent orbital pairs within the alpha and beta sectors
+        - Double-excitation block coupling alpha and beta sectors, preserving both N and Sz=0
     For 2e/2o with reps=2:
         4 RZ + 2 Givens (alpha, beta) + 1 Double excitation = 7 parameters per rep.
         Total parameters = 2 * 7 = 14 parameters.
-    100% of state probability amplitude remains strictly inside the (N_alpha=1, N_beta=1) sector.
+    100% of state probability amplitude remains strictly inside the target (N_alpha, N_beta) sector.
     """
     mapper = qubit_mapper or JordanWignerMapper()
     num_qubits = num_spatial_orbitals * 2
+    n_alpha_pairs = num_spatial_orbitals - 1
+    n_beta_pairs = num_spatial_orbitals - 1
     
-    # 4 RZ + 2 Givens (alpha 0-1, beta 2-3) + 1 Double excitation = 7 params per layer
-    params_per_rep = num_qubits + 2 + 1
+    dexc_template = UCC(
+        num_spatial_orbitals=num_spatial_orbitals,
+        num_particles=num_particles,
+        excitations="d",
+        qubit_mapper=mapper,
+        initial_state=None
+    )
+    n_dexc = dexc_template.num_parameters
+    params_per_rep = num_qubits + n_alpha_pairs + n_beta_pairs + n_dexc
     total_params = reps * params_per_rep
     
     params = ParameterVector("θ_PCU2", total_params)
@@ -59,14 +65,6 @@ def build_particle_conserving_u2(
     hf_state = HartreeFock(num_spatial_orbitals, num_particles, mapper)
     qc.compose(hf_state, inplace=True)
     
-    dexc_template = UCC(
-        num_spatial_orbitals=num_spatial_orbitals,
-        num_particles=num_particles,
-        excitations="d",
-        qubit_mapper=mapper,
-        initial_state=None
-    )
-    
     param_idx = 0
     for r in range(reps):
         # 1. RZ on every qubit (preserves local particle number)
@@ -74,16 +72,19 @@ def build_particle_conserving_u2(
             qc.rz(params[param_idx], q)
             param_idx += 1
             
-        # 2. Spin-aware Givens rotations: alpha pair (0, 1) and beta pair (2, 3)
-        qc.append(XXPlusYYGate(params[param_idx]), [0, 1])
-        param_idx += 1
-        qc.append(XXPlusYYGate(params[param_idx]), [2, 3])
-        param_idx += 1
+        # 2. Spin-aware Givens rotations: alpha sector pairs and beta sector pairs
+        for i in range(num_spatial_orbitals - 1):
+            qc.append(XXPlusYYGate(params[param_idx]), [i, i + 1])
+            param_idx += 1
+        for i in range(num_spatial_orbitals - 1):
+            q_b = num_spatial_orbitals + i
+            qc.append(XXPlusYYGate(params[param_idx]), [q_b, q_b + 1])
+            param_idx += 1
         
         # 3. Double excitation block coupling alpha and beta pairs
-        d_block = dexc_template.assign_parameters([params[param_idx]])
-        qc.compose(d_block, inplace=True)
-        param_idx += 1
+        d_params = [params[param_idx + j] for j in range(n_dexc)]
+        qc.compose(dexc_template.assign_parameters(d_params), inplace=True)
+        param_idx += n_dexc
         
     return qc
 
@@ -114,16 +115,19 @@ def get_ansatz_dict(
     num_particles: tuple[int, int] = (1, 1),
     k_reps: int = 3,
     pcu2_reps: int = 2,
-    include_sa: bool = True
+    include_sa: bool = True,
+    include_k_variants: bool = False,
+    include_hf: bool = False
 ) -> dict[str, QuantumCircuit]:
     """
     Returns the dictionary of benchmark ansätze:
-    - DexcG: UCC with excitations='d' (1 parameter for 2e/2o)
-    - PCU2: ParticleConservingU2 with genuine Givens rotations and double excitation layer (14 params for 2e/2o)
-    - UCCSD: Standard UCC singles and doubles (3 parameters for 2e/2o)
-    - UCCSD-SA: Spin-adapted UCCSD with tied single excitations theta_alpha = theta_beta (2 parameters for 2e/2o)
-    - k-UpCCGSD: Generic UpCCGSD with paired doubles + generalized singles, reps=k (9 parameters for 2e/2o, k=3).
-      Note: For (2e, 2o), k-UpCCGSD is strictly redundant with UCCSD as generalized singles/doubles coincide with UCCSD.
+    - DexcG: UCC with excitations='d'
+    - PCU2: ParticleConservingU2 with genuine Givens rotations and double excitation layer
+    - UCCSD: Standard UCC singles and doubles
+    - UCCSD-SA: Spin-adapted UCCSD with tied single excitations theta_alpha = theta_beta
+    - k-UpCCGSD: Generic UpCCGSD with paired doubles + generalized singles, reps=k.
+      (If include_k_variants=True, returns 1-UpCCGSD, 2-UpCCGSD, 3-UpCCGSD)
+    - HF_baseline: Hartree-Fock state reference (0 parameters, if include_hf=True)
     """
     mapper = JordanWignerMapper()
     hf_state = HartreeFock(num_spatial_orbitals, num_particles, mapper)
@@ -153,39 +157,68 @@ def get_ansatz_dict(
     )
     uccsd.name = "UCCSD"
     
-    # Generic UpCCGSD with paired doubles + generalized singles
-    kupccgsd = UCC(
-        num_spatial_orbitals=num_spatial_orbitals,
-        num_particles=num_particles,
-        excitations=generate_upccgsd_excitations,
-        qubit_mapper=mapper,
-        initial_state=hf_state,
-        reps=k_reps
-    )
-    kupccgsd.name = "k-UpCCGSD"
-    
-    # Attach redundancy metadata for 2e,2o space
-    is_2e2o = (num_spatial_orbitals == 2 and num_particles == (1, 1))
-    setattr(kupccgsd, "redundant_with_uccsd", is_2e2o)
-    
     ansatze = {
         "DexcG": dexcg,
         "PCU2": pcu2,
         "UCCSD": uccsd,
     }
     
-    if include_sa and is_2e2o:
-        # Spin-adapted UCCSD (theta_alpha = theta_beta tied) -> 2 parameters
-        theta_sa = ParameterVector("theta_SA", 2)
-        uccsd_sa = uccsd.assign_parameters({
-            uccsd.parameters[0]: theta_sa[0],
-            uccsd.parameters[1]: theta_sa[0],
-            uccsd.parameters[2]: theta_sa[1]
-        })
+    if include_sa:
+        # Spin-adapted UCCSD: tie alpha single excitations to corresponding beta single excitations
+        param_map = {}
+        sa_counter = 0
+        p_vec = ParameterVector("θ_SA", uccsd.num_parameters)
+        for i, ex in enumerate(uccsd.excitation_list):
+            if len(ex[0]) == 1:
+                p, q = ex[0][0], ex[1][0]
+                if p >= num_spatial_orbitals:
+                    # Beta single: find corresponding alpha single
+                    alpha_ex = ((p - num_spatial_orbitals,), (q - num_spatial_orbitals,))
+                    alpha_idx = uccsd.excitation_list.index(alpha_ex)
+                    param_map[uccsd.parameters[i]] = param_map[uccsd.parameters[alpha_idx]]
+                else:
+                    param_map[uccsd.parameters[i]] = p_vec[sa_counter]
+                    sa_counter += 1
+            else:
+                param_map[uccsd.parameters[i]] = p_vec[sa_counter]
+                sa_counter += 1
+        uccsd_sa = uccsd.assign_parameters(param_map)
         uccsd_sa.name = "UCCSD-SA"
         ansatze["UCCSD-SA"] = uccsd_sa
-        
-    ansatze["k-UpCCGSD"] = kupccgsd
+
+    is_2e2o = (num_spatial_orbitals == 2 and num_particles == (1, 1))
+
+    if include_k_variants:
+        for k in [1, 2, 3]:
+            kup = UCC(
+                num_spatial_orbitals=num_spatial_orbitals,
+                num_particles=num_particles,
+                excitations=generate_upccgsd_excitations,
+                qubit_mapper=mapper,
+                initial_state=hf_state,
+                reps=k
+            )
+            kup.name = f"{k}-UpCCGSD"
+            setattr(kup, "redundant_with_uccsd", is_2e2o)
+            ansatze[f"{k}-UpCCGSD"] = kup
+    else:
+        kupccgsd = UCC(
+            num_spatial_orbitals=num_spatial_orbitals,
+            num_particles=num_particles,
+            excitations=generate_upccgsd_excitations,
+            qubit_mapper=mapper,
+            initial_state=hf_state,
+            reps=k_reps
+        )
+        kupccgsd.name = "k-UpCCGSD"
+        setattr(kupccgsd, "redundant_with_uccsd", is_2e2o)
+        ansatze["k-UpCCGSD"] = kupccgsd
+
+    if include_hf:
+        hf_baseline = HartreeFock(num_spatial_orbitals, num_particles, mapper)
+        hf_baseline.name = "HF_baseline"
+        ansatze["HF_baseline"] = hf_baseline
+
     return ansatze
 
 def evaluate_parity_mapper_reduction(basis: str = "6-31g(d,p)") -> dict:

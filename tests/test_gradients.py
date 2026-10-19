@@ -90,3 +90,42 @@ def test_gradient_descent_monotonic_decrease_dexcg(setup_hamiltonian_and_ansatze
         
     assert final_e < hist[0], "GD failed to decrease energy from initial point"
 
+
+def test_hard_problem_gradient_accuracy():
+    """
+    Assert gradient correctness vs central finite difference for each ansatz
+    on the hard benchmark problem (8 qubits) at 5 random points (tolerance 1e-6)
+    as required by Phase C2.
+    """
+    from src.molecule import load_hard_hamiltonian
+    H, _, _ = load_hard_hamiltonian()
+    ansatze = get_ansatz_dict(4, (2, 2), include_k_variants=True)
+    estimator = StatevectorEstimator()
+    seeds = [0, 1, 2, 3, 42]
+    eps = 1e-5
+
+    for name in ["DexcG", "UCCSD", "UCCSD-SA", "1-UpCCGSD"]:
+        qc = ansatze[name].decompose().decompose()
+        n_params = qc.num_parameters
+        for s in seeds:
+            rng = np.random.RandomState(s)
+            pt = rng.uniform(0.0, 2.0 * np.pi, n_params)
+            g_batched = compute_gradient_batched(qc, H, pt, estimator, method="finite_diff", eps=eps)
+
+            # Independent central finite difference
+            g_indep = np.zeros(n_params)
+            for i in range(n_params):
+                p_plus = np.copy(pt)
+                p_minus = np.copy(pt)
+                p_plus[i] += eps
+                p_minus[i] -= eps
+                e_plus = float(estimator.run([(qc, H, [p_plus])]).result()[0].data.evs[0])
+                e_minus = float(estimator.run([(qc, H, [p_minus])]).result()[0].data.evs[0])
+                g_indep[i] = (e_plus - e_minus) / (2.0 * eps)
+
+            max_diff = np.max(np.abs(g_batched - g_indep))
+            assert max_diff < 1e-6, (
+                f"Gradient mismatch for {name} on hard problem at seed {s}: max diff = {max_diff:.2e}"
+            )
+
+
