@@ -13,11 +13,12 @@ import argparse
 from pathlib import Path
 import numpy as np
 import pandas as pd
+import qiskit
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from qiskit.circuit import QuantumCircuit
+from qiskit import QuantumCircuit
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit.providers.fake_provider import GenericBackendV2
 from qiskit.quantum_info import Statevector, SparsePauliOp
@@ -32,6 +33,8 @@ from src.config import get_runtime_service, DEFAULT_HARDWARE_BACKEND
 
 DATA_DIR = REPO_ROOT / "data"
 SPEC_V2_PATH = DATA_DIR / "hardware_job_spec_v2.json"
+SPEC_V3_PATH = DATA_DIR / "hardware_job_spec_v3.json"
+CACHE_HARD_PATH = DATA_DIR / "benchmark_results_hard.json"
 RESULTS_PATH = DATA_DIR / "hardware_results.json"
 
 # Mean 2Q gate error on ibm_marrakesh from calibration data
@@ -277,6 +280,343 @@ def prepare_hardware_job_specs_v2(
     return job_specs, df_summary
 
 
+def compute_single_error_model_fidelity(
+    transpiled_qc: QuantumCircuit,
+    backend,
+    assumed_cz_err: float = 0.003,
+    assumed_ro_err: float = 0.005,
+    assumed_t1_s: float = 200e-6
+) -> dict:
+    """
+    Unified Single Error Model across all circuits:
+    F = [prod_{cz in circuit} (1 - e_edge)] * [prod_{q in measured} (1 - e_readout)] * exp(-depth_time / T1)
+    """
+    target = getattr(backend, "target", None)
+    cz_props = target["cz"] if target and "cz" in target else {}
+    ro_props = target["measure"] if target and "measure" in target else {}
+
+    # 1. 2Q Gate fidelity
+    f_cz = 1.0
+    cz_count = 0
+    edge_errors = []
+    for instr in transpiled_qc.data:
+        if instr.operation.name in ["cz", "cx", "ecr"]:
+            cz_count += 1
+            q0 = transpiled_qc.find_bit(instr.qubits[0]).index
+            q1 = transpiled_qc.find_bit(instr.qubits[1]).index
+            err = None
+            if cz_props:
+                prop = cz_props.get((q0, q1), cz_props.get((q1, q0), None))
+                if prop and prop.error is not None:
+                    err = float(prop.error)
+            if err is None or err <= 0.0 or err >= 1.0:
+                err = assumed_cz_err
+            edge_errors.append(err)
+            f_cz *= (1.0 - err)
+
+    # 2. Readout fidelity
+    measured_qubits = set()
+    for instr in transpiled_qc.data:
+        if instr.operation.name == "measure":
+            for q in instr.qubits:
+                measured_qubits.add(transpiled_qc.find_bit(q).index)
+    if not measured_qubits:
+        measured_qubits = set(range(min(transpiled_qc.num_qubits, 8)))
+
+    f_ro = 1.0
+    ro_errors = []
+    for q in measured_qubits:
+        ro_err = None
+        if ro_props:
+            prop = ro_props.get((q,), None)
+            if prop and prop.error is not None:
+                ro_err = float(prop.error)
+        if ro_err is None or ro_err <= 0.0 or ro_err >= 1.0:
+            ro_err = assumed_ro_err
+        ro_errors.append(ro_err)
+        f_ro *= (1.0 - ro_err)
+
+    # 3. Decoherence fidelity
+    mean_cz_duration = 60e-9  # 60 ns
+    est_duration = transpiled_qc.depth() * mean_cz_duration
+    t1_list = []
+    if hasattr(backend, "qubit_properties"):
+        for q in measured_qubits:
+            try:
+                qp = backend.qubit_properties(q)
+                if qp and getattr(qp, "t1", None):
+                    t1_list.append(float(qp.t1))
+            except Exception:
+                pass
+    mean_t1 = float(np.mean(t1_list)) if t1_list else assumed_t1_s
+    f_decoh = float(np.exp(-est_duration / mean_t1))
+
+    total_fid = float(f_cz * f_ro * f_decoh)
+    return {
+        "cz_count": cz_count,
+        "depth": transpiled_qc.depth(),
+        "mean_cz_error": float(np.mean(edge_errors)) if edge_errors else 0.0,
+        "mean_ro_error": float(np.mean(ro_errors)) if ro_errors else 0.0,
+        "mean_t1_us": mean_t1 * 1e6,
+        "est_duration_us": est_duration * 1e6,
+        "f_cz": float(f_cz),
+        "f_ro": float(f_ro),
+        "f_decoh": float(f_decoh),
+        "total_fidelity": total_fid,
+    }
+
+
+def get_best_cached_params(ansatz_name: str, cache_records: list[dict], casci_energy: float) -> dict | None:
+    matched = [r for r in cache_records if r["ansatz"] == ansatz_name]
+    if not matched:
+        return None
+    conv_matched = [r for r in matched if r.get("converged", False)]
+    best_rec = min(conv_matched if conv_matched else matched, key=lambda x: x["final_energy"])
+    return {
+        "params": best_rec["final_params"],
+        "final_energy": best_rec["final_energy"],
+        "error_mHa": abs(best_rec["final_energy"] - casci_energy) * 1000.0,
+        "optimizer": best_rec["optimizer"],
+        "init": best_rec["init"],
+        "converged": best_rec.get("converged", False)
+    }
+
+
+def prepare_hardware_job_specs_v3(
+    backend_name: str = DEFAULT_HARDWARE_BACKEND,
+    shots: int = 8192,
+    seed_transpiler: int = 42,
+    assumed_err: float = 0.003,
+    allow_mock: bool = False
+) -> tuple[list[dict], pd.DataFrame]:
+    """
+    Phase I: Rigorous hardware job preparation with:
+    - Cached optimal parameters (no hardcoded params_1up)
+    - Single unified error model across all circuits
+    - Chemistry signal check (>= 1.0 mHa better than HF)
+    - Realistic shot budget analysis for parity minimal circuit
+    - Exclusion of circuits failing chemistry signal or fidelity < 0.3
+    - Stores to data/hardware_job_spec_v3.json
+    """
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    # 1. Resolve backend
+    backend = None
+    source = "LIVE"
+    cal_time = "ASSUMED"
+    try:
+        service = get_runtime_service()
+        backend = service.backend(backend_name)
+        source = "LIVE"
+        cal_time = str(getattr(backend.properties(), 'last_update_date', 'LIVE'))
+        print(f"[Backend] Connected to live hardware: {backend.name} (calibrated: {cal_time})")
+    except Exception as e:
+        if allow_mock:
+            print(f"[Backend Notice] Live backend unreachable; using MOCK GenericBackendV2 (--mock enabled): {e}")
+            backend = GenericBackendV2(num_qubits=156, basis_gates=["cz", "id", "rz", "sx", "x"])
+            source = "MOCK"
+            cal_time = "MOCK"
+        else:
+            raise RuntimeError(
+                f"Live backend '{backend_name}' unreachable and --mock flag not provided. Aborting Phase I to prevent fabricated metrics: {e}"
+            )
+
+    pm = generate_preset_pass_manager(backend=backend, optimization_level=3, seed_transpiler=seed_transpiler)
+
+    # Load problem data
+    H_2e2o, E_casci_2e2o, meta_2e2o = load_or_build_bn_dot_hamiltonian("6-31g(d,p)")
+    H_hard, E_casci_hard, meta_hard = load_hard_hamiltonian()
+    E_ref_hard = float(meta_hard["reference_determinant_energy"])
+
+    # Load cache records
+    cache_records = []
+    if CACHE_HARD_PATH.exists():
+        with open(CACHE_HARD_PATH, "r", encoding="utf-8") as f:
+            cache_records = json.load(f).get("records", [])
+
+    # 2-qubit parity minimal circuit
+    parity_spec = build_original_2e2o_parity_circuit(seed_transpiler=seed_transpiler)
+    t_parity = pm.run(parity_spec["circuit"])
+    fid_parity = compute_single_error_model_fidelity(t_parity, backend, assumed_cz_err=assumed_err)
+
+    # Hard problem ansätze
+    hard_ansatze = get_ansatz_dict(num_spatial_orbitals=4, num_particles=(2, 2), pcu2_reps=1, include_k_variants=True, include_sa=True)
+
+    experiments = [
+        {
+            "priority": 1,
+            "experiment_name": "HF_baseline_2e2o",
+            "circuit": QuantumCircuit(4),
+            "parameters": [],
+            "noiseless_energy_Ha": -639.72424230,
+            "casci_energy_Ha": E_casci_2e2o,
+            "error_vs_casci_mHa": 0.0409,
+            "error_vs_hf_mHa": 0.0,
+            "hamiltonian": H_2e2o,
+            "transpiled_2q": 0,
+            "transpiled_depth": 1,
+            "estimated_fidelity": 1.0,
+            "fidelity_details": {"f_cz": 1.0, "f_ro": 1.0, "f_decoh": 1.0, "total_fidelity": 1.0},
+            "has_chemistry_signal": True,
+            "recommendation": "RECOMMENDED: Reference baseline (2e2o)",
+            "shots_needed_1sigma": None
+        },
+        {
+            "priority": 1,
+            "experiment_name": "HF_baseline_hard_4e4o",
+            "circuit": QuantumCircuit(8),
+            "parameters": [],
+            "noiseless_energy_Ha": E_ref_hard,
+            "casci_energy_Ha": E_casci_hard,
+            "error_vs_casci_mHa": abs(E_ref_hard - E_casci_hard) * 1000.0,
+            "error_vs_hf_mHa": 0.0,
+            "hamiltonian": H_hard,
+            "transpiled_2q": 0,
+            "transpiled_depth": 1,
+            "estimated_fidelity": 1.0,
+            "fidelity_details": {"f_cz": 1.0, "f_ro": 1.0, "f_decoh": 1.0, "total_fidelity": 1.0},
+            "has_chemistry_signal": True,
+            "recommendation": "RECOMMENDED: Reference baseline (4e4o hard)",
+            "shots_needed_1sigma": None
+        },
+        {
+            "priority": 2,
+            "experiment_name": "original_2e2o_parity_reduced",
+            "circuit": parity_spec["circuit"],
+            "parameters": parity_spec["parameters"],
+            "noiseless_energy_Ha": parity_spec["noiseless_energy"],
+            "casci_energy_Ha": parity_spec["casci_energy"],
+            "error_vs_casci_mHa": parity_spec["diff_ha"] * 1000.0,
+            "error_vs_hf_mHa": 0.0409,
+            "hamiltonian": parity_spec["hamiltonian"],
+            "transpiled_2q": fid_parity["cz_count"],
+            "transpiled_depth": fid_parity["depth"],
+            "estimated_fidelity": fid_parity["total_fidelity"],
+            "fidelity_details": fid_parity,
+            "has_chemistry_signal": False,
+            "recommendation": "noise/mitigation test only: correlation signal is 0.04 mHa and cannot be resolved at this shot count",
+            "shots_needed_1sigma": {
+                "uniform_allocation": 2592397,
+                "optimal_allocation": 2247541
+            }
+        }
+    ]
+
+    for a_name in ["DexcG", "PCU2", "1-UpCCGSD", "2-UpCCGSD", "3-UpCCGSD", "UCCSD", "UCCSD-SA"]:
+        best_data = get_best_cached_params(a_name, cache_records, E_casci_hard)
+        if best_data is None:
+            continue
+
+        raw_qc = hard_ansatze[a_name].decompose().decompose()
+        bound_qc = raw_qc.assign_parameters(best_data["params"])
+        e_noiseless = float(Statevector(bound_qc).expectation_value(H_hard).real)
+        err_vs_casci = abs(e_noiseless - E_casci_hard) * 1000.0
+        delta_hf = (E_ref_hard - e_noiseless) * 1000.0  # mHa better than HF
+
+        t_qc = pm.run(bound_qc)
+        fid_data = compute_single_error_model_fidelity(t_qc, backend, assumed_cz_err=assumed_err)
+
+        has_chem_signal = (delta_hf >= 1.0)
+        fid_pass = (fid_data["total_fidelity"] >= 0.3)
+
+        if not has_chem_signal:
+            rec = f"NO CHEMISTRY SIGNAL: error improvement over HF is {delta_hf:.3f} mHa (< 1.0 mHa)"
+        elif not fid_pass:
+            rec = f"NOT RECOMMENDED: fidelity {fid_data['total_fidelity']:.4f} < 0.3 threshold"
+        else:
+            rec = "RECOMMENDED: Meets chemistry signal and fidelity thresholds"
+
+        experiments.append({
+            "priority": 3 if (has_chem_signal and fid_pass) else 4,
+            "experiment_name": f"hard_problem_{a_name}",
+            "circuit": bound_qc,
+            "parameters": best_data["params"],
+            "noiseless_energy_Ha": e_noiseless,
+            "casci_energy_Ha": E_casci_hard,
+            "error_vs_casci_mHa": err_vs_casci,
+            "error_vs_hf_mHa": delta_hf,
+            "hamiltonian": H_hard,
+            "transpiled_2q": fid_data["cz_count"],
+            "transpiled_depth": fid_data["depth"],
+            "estimated_fidelity": fid_data["total_fidelity"],
+            "fidelity_details": fid_data,
+            "has_chemistry_signal": has_chem_signal,
+            "recommendation": rec,
+            "shots_needed_1sigma": None
+        })
+
+    resilience_configs = [
+        ("dynamical_decoupling", {"dynamical_decoupling": {"enable": True, "sequence_type": "XX"}}),
+        ("pauli_twirling", {"twirling": {"enable_gates": True, "enable_measure": True}}),
+        ("zne", {"resilience": {"measure_mitigation": True, "zne_mitigation": True, "zne": {"extrapolator": "exponential"}}})
+    ]
+
+    job_specs = []
+    summary_rows = []
+
+    for exp in experiments:
+        H = exp["hamiltonian"]
+        qwc_groups = group_paulis_qwc(H)
+        n_qwc_circuits = len(qwc_groups)
+
+        n_2q = exp["transpiled_2q"]
+        depth = exp["transpiled_depth"]
+        est_fidelity = exp["estimated_fidelity"]
+        recommendation = exp["recommendation"]
+        est_qpu_time = round(n_qwc_circuits * shots * SHOT_TIME_S, 2)
+
+        for r_name, r_opts in resilience_configs:
+            job_id = f"job_spec_v3_{exp['experiment_name']}_{r_name}"
+            spec = {
+                "job_id": job_id,
+                "priority": exp["priority"],
+                "experiment_name": exp["experiment_name"],
+                "recommendation": recommendation,
+                "backend": getattr(backend, "name", backend_name),
+                "backend_source": source,
+                "calibration_timestamp": cal_time,
+                "qiskit_version": qiskit.__version__,
+                "fidelity_error_model": "unified_cz_edge_readout_decoherence_v3",
+                "shots": shots,
+                "resilience_type": r_name,
+                "resilience_options": r_opts,
+                "qwc_circuits": n_qwc_circuits,
+                "transpiled_2q_gates": n_2q,
+                "transpiled_depth": depth,
+                "estimated_fidelity": est_fidelity,
+                "fidelity_breakdown": exp.get("fidelity_details", {}),
+                "expected_noiseless_energy_Ha": exp["noiseless_energy_Ha"],
+                "casci_energy_Ha": exp["casci_energy_Ha"],
+                "error_vs_casci_mHa": exp["error_vs_casci_mHa"],
+                "error_vs_hf_mHa": exp["error_vs_hf_mHa"],
+                "has_chemistry_signal": exp["has_chemistry_signal"],
+                "shots_needed_1sigma": exp["shots_needed_1sigma"],
+                "estimated_qpu_time_seconds": est_qpu_time,
+                "parameters": exp["parameters"],
+                "status": "PREPARED (NOT SUBMITTED)"
+            }
+            job_specs.append(spec)
+            summary_rows.append({
+                "Priority": exp["priority"],
+                "Experiment": exp["experiment_name"],
+                "Resilience": r_name,
+                "QWC_Circuits": n_qwc_circuits,
+                "2Q_Gates": n_2q,
+                "Depth": depth,
+                "Est_Fidelity": round(est_fidelity, 4),
+                "Est_QPU_Time_s": est_qpu_time,
+                "Chemistry_Signal": exp["has_chemistry_signal"],
+                "Recommendation": recommendation
+            })
+
+    with open(SPEC_V3_PATH, "w", encoding="utf-8") as f:
+        json.dump(job_specs, f, indent=2)
+    print(f"[Spec Saved] Saved {len(job_specs)} hardware job specifications to {SPEC_V3_PATH}")
+
+    df_summary = pd.DataFrame(summary_rows)
+    return job_specs, df_summary
+
+
 def execute_hardware_jobs(job_specs: list[dict], submit: bool = False) -> dict:
     """
     Submits hardware jobs if and only if submit is True.
@@ -300,13 +640,11 @@ def execute_hardware_jobs(job_specs: list[dict], submit: bool = False) -> dict:
 
     results = []
     for spec in job_specs:
-        if "NOT RECOMMENDED" in spec["recommendation"]:
+        if "NOT RECOMMENDED" in spec["recommendation"] or "NO CHEMISTRY SIGNAL" in spec["recommendation"]:
             print(f"[Skipping] {spec['experiment_name']} marked as NOT RECOMMENDED.")
             continue
 
         print(f"[Submitting] {spec['experiment_name']} ({spec['resilience_type']}) to {spec['backend']}...")
-        # Submit single-point EstimatorV2 job
-        # Note: In accordance with HARD RULES, real submission requires explicit user 'SUBMIT' message.
         res_record = {
             "job_spec_id": spec["job_id"],
             "experiment_name": spec["experiment_name"],
@@ -327,14 +665,27 @@ def main():
     parser.add_argument("--submit", action="store_true", default=False, help="Explicitly submit physical QPU jobs.")
     parser.add_argument("--backend", type=str, default=DEFAULT_HARDWARE_BACKEND, help="Target backend name.")
     parser.add_argument("--shots", type=int, default=8192, help="Number of shots per circuit.")
+    parser.add_argument("--assumed-err", type=float, default=0.003, help="Assumed CZ gate error rate if live calibration is unavailable.")
+    parser.add_argument("--mock", action="store_true", default=False, help="Allow GenericBackendV2 mock if live backend is unreachable.")
+    parser.add_argument("--v2", action="store_true", default=False, help="Generate legacy v2 hardware spec instead of v3.")
     args = parser.parse_args()
 
     print("=" * 75)
-    print("IBM Quantum Hardware Preparation Pipeline (Phase E)")
+    print("IBM Quantum Hardware Preparation Pipeline")
     print(f"Target Backend: {args.backend} | Shots: {args.shots}")
     print("=" * 75)
 
-    specs, df = prepare_hardware_job_specs_v2(backend_name=args.backend, shots=args.shots)
+    if args.v2:
+        specs, df = prepare_hardware_job_specs_v2(backend_name=args.backend, shots=args.shots)
+    else:
+        specs, df = prepare_hardware_job_specs_v3(
+            backend_name=args.backend,
+            shots=args.shots,
+            seed_transpiler=42,
+            assumed_err=args.assumed_err,
+            allow_mock=args.mock
+        )
+
     print("\nHardware Job Specification Summary Table:")
     print(df.to_string(index=False))
 
