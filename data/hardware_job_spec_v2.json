@@ -1,0 +1,566 @@
+[
+  {
+    "job_id": "job_spec_v2_HF_baseline_2e2o_dynamical_decoupling",
+    "priority": 1,
+    "experiment_name": "HF_baseline_2e2o",
+    "recommendation": "RECOMMENDED: Reference baseline",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "dynamical_decoupling",
+    "resilience_options": {
+      "dynamical_decoupling": {
+        "enable": true,
+        "sequence_type": "XX"
+      }
+    },
+    "qwc_circuits": 9,
+    "transpiled_2q_gates": 0,
+    "transpiled_depth": 1,
+    "estimated_fidelity": 1.0,
+    "expected_noiseless_energy_Ha": -639.7242423,
+    "casci_energy_Ha": -639.7242832271774,
+    "error_vs_casci_mHa": 0.0409,
+    "estimated_qpu_time_seconds": 7.37,
+    "parameters": [],
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "job_id": "job_spec_v2_HF_baseline_2e2o_pauli_twirling",
+    "priority": 1,
+    "experiment_name": "HF_baseline_2e2o",
+    "recommendation": "RECOMMENDED: Reference baseline",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "pauli_twirling",
+    "resilience_options": {
+      "twirling": {
+        "enable_gates": true,
+        "enable_measure": true
+      }
+    },
+    "qwc_circuits": 9,
+    "transpiled_2q_gates": 0,
+    "transpiled_depth": 1,
+    "estimated_fidelity": 1.0,
+    "expected_noiseless_energy_Ha": -639.7242423,
+    "casci_energy_Ha": -639.7242832271774,
+    "error_vs_casci_mHa": 0.0409,
+    "estimated_qpu_time_seconds": 7.37,
+    "parameters": [],
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "job_id": "job_spec_v2_HF_baseline_2e2o_zne",
+    "priority": 1,
+    "experiment_name": "HF_baseline_2e2o",
+    "recommendation": "RECOMMENDED: Reference baseline",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "zne",
+    "resilience_options": {
+      "resilience": {
+        "measure_mitigation": true,
+        "zne_mitigation": true,
+        "zne": {
+          "extrapolator": "exponential"
+        }
+      }
+    },
+    "qwc_circuits": 9,
+    "transpiled_2q_gates": 0,
+    "transpiled_depth": 1,
+    "estimated_fidelity": 1.0,
+    "expected_noiseless_energy_Ha": -639.7242423,
+    "casci_energy_Ha": -639.7242832271774,
+    "error_vs_casci_mHa": 0.0409,
+    "estimated_qpu_time_seconds": 7.37,
+    "parameters": [],
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "job_id": "job_spec_v2_HF_baseline_hard_4e4o_dynamical_decoupling",
+    "priority": 1,
+    "experiment_name": "HF_baseline_hard_4e4o",
+    "recommendation": "RECOMMENDED: Reference baseline",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "dynamical_decoupling",
+    "resilience_options": {
+      "dynamical_decoupling": {
+        "enable": true,
+        "sequence_type": "XX"
+      }
+    },
+    "qwc_circuits": 75,
+    "transpiled_2q_gates": 0,
+    "transpiled_depth": 1,
+    "estimated_fidelity": 1.0,
+    "expected_noiseless_energy_Ha": -637.5731962711441,
+    "casci_energy_Ha": -637.5813354347313,
+    "error_vs_casci_mHa": 8.139163587202347,
+    "estimated_qpu_time_seconds": 61.44,
+    "parameters": [],
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "job_id": "job_spec_v2_HF_baseline_hard_4e4o_pauli_twirling",
+    "priority": 1,
+    "experiment_name": "HF_baseline_hard_4e4o",
+    "recommendation": "RECOMMENDED: Reference baseline",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "pauli_twirling",
+    "resilience_options": {
+      "twirling": {
+        "enable_gates": true,
+        "enable_measure": true
+      }
+    },
+    "qwc_circuits": 75,
+    "transpiled_2q_gates": 0,
+    "transpiled_depth": 1,
+    "estimated_fidelity": 1.0,
+    "expected_noiseless_energy_Ha": -637.5731962711441,
+    "casci_energy_Ha": -637.5813354347313,
+    "error_vs_casci_mHa": 8.139163587202347,
+    "estimated_qpu_time_seconds": 61.44,
+    "parameters": [],
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "job_id": "job_spec_v2_HF_baseline_hard_4e4o_zne",
+    "priority": 1,
+    "experiment_name": "HF_baseline_hard_4e4o",
+    "recommendation": "RECOMMENDED: Reference baseline",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "zne",
+    "resilience_options": {
+      "resilience": {
+        "measure_mitigation": true,
+        "zne_mitigation": true,
+        "zne": {
+          "extrapolator": "exponential"
+        }
+      }
+    },
+    "qwc_circuits": 75,
+    "transpiled_2q_gates": 0,
+    "transpiled_depth": 1,
+    "estimated_fidelity": 1.0,
+    "expected_noiseless_energy_Ha": -637.5731962711441,
+    "casci_energy_Ha": -637.5813354347313,
+    "error_vs_casci_mHa": 8.139163587202347,
+    "estimated_qpu_time_seconds": 61.44,
+    "parameters": [],
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "job_id": "job_spec_v2_original_2e2o_parity_reduced_dynamical_decoupling",
+    "priority": 2,
+    "experiment_name": "original_2e2o_parity_reduced",
+    "recommendation": "RECOMMENDED: Minimal 2-qubit circuit (< 1e-6 Ha match)",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "dynamical_decoupling",
+    "resilience_options": {
+      "dynamical_decoupling": {
+        "enable": true,
+        "sequence_type": "XX"
+      }
+    },
+    "qwc_circuits": 4,
+    "transpiled_2q_gates": 2,
+    "transpiled_depth": 11,
+    "estimated_fidelity": 0.9219840399999999,
+    "expected_noiseless_energy_Ha": -639.724283013849,
+    "casci_energy_Ha": -639.7242832271774,
+    "error_vs_casci_mHa": 0.00021332834876375273,
+    "estimated_qpu_time_seconds": 3.28,
+    "parameters": [
+      3.13513687
+    ],
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "job_id": "job_spec_v2_original_2e2o_parity_reduced_pauli_twirling",
+    "priority": 2,
+    "experiment_name": "original_2e2o_parity_reduced",
+    "recommendation": "RECOMMENDED: Minimal 2-qubit circuit (< 1e-6 Ha match)",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "pauli_twirling",
+    "resilience_options": {
+      "twirling": {
+        "enable_gates": true,
+        "enable_measure": true
+      }
+    },
+    "qwc_circuits": 4,
+    "transpiled_2q_gates": 2,
+    "transpiled_depth": 11,
+    "estimated_fidelity": 0.9219840399999999,
+    "expected_noiseless_energy_Ha": -639.724283013849,
+    "casci_energy_Ha": -639.7242832271774,
+    "error_vs_casci_mHa": 0.00021332834876375273,
+    "estimated_qpu_time_seconds": 3.28,
+    "parameters": [
+      3.13513687
+    ],
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "job_id": "job_spec_v2_original_2e2o_parity_reduced_zne",
+    "priority": 2,
+    "experiment_name": "original_2e2o_parity_reduced",
+    "recommendation": "RECOMMENDED: Minimal 2-qubit circuit (< 1e-6 Ha match)",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "zne",
+    "resilience_options": {
+      "resilience": {
+        "measure_mitigation": true,
+        "zne_mitigation": true,
+        "zne": {
+          "extrapolator": "exponential"
+        }
+      }
+    },
+    "qwc_circuits": 4,
+    "transpiled_2q_gates": 2,
+    "transpiled_depth": 11,
+    "estimated_fidelity": 0.9219840399999999,
+    "expected_noiseless_energy_Ha": -639.724283013849,
+    "casci_energy_Ha": -639.7242832271774,
+    "error_vs_casci_mHa": 0.00021332834876375273,
+    "estimated_qpu_time_seconds": 3.28,
+    "parameters": [
+      3.13513687
+    ],
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "job_id": "job_spec_v2_hard_problem_1-UpCCGSD_dynamical_decoupling",
+    "priority": 3,
+    "experiment_name": "hard_problem_1-UpCCGSD",
+    "recommendation": "RECOMMENDED: Meets fidelity threshold (> 0.3)",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "dynamical_decoupling",
+    "resilience_options": {
+      "dynamical_decoupling": {
+        "enable": true,
+        "sequence_type": "XX"
+      }
+    },
+    "qwc_circuits": 75,
+    "transpiled_2q_gates": 489,
+    "transpiled_depth": 1347,
+    "estimated_fidelity": 0.40560939472881147,
+    "expected_noiseless_energy_Ha": -637.5731902593235,
+    "casci_energy_Ha": -637.5813354347313,
+    "error_vs_casci_mHa": 8.14517540777615,
+    "estimated_qpu_time_seconds": 61.44,
+    "parameters": [
+      0.000302,
+      0.000108,
+      -0.000108,
+      -0.000302,
+      0.000108,
+      0.000302,
+      -0.000302,
+      -0.000108,
+      -0.000108,
+      -0.000302,
+      0.000108,
+      0.000302,
+      -0.000302,
+      -0.000108,
+      0.000108,
+      0.000302,
+      -0.000108,
+      -0.000302
+    ],
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "job_id": "job_spec_v2_hard_problem_1-UpCCGSD_pauli_twirling",
+    "priority": 3,
+    "experiment_name": "hard_problem_1-UpCCGSD",
+    "recommendation": "RECOMMENDED: Meets fidelity threshold (> 0.3)",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "pauli_twirling",
+    "resilience_options": {
+      "twirling": {
+        "enable_gates": true,
+        "enable_measure": true
+      }
+    },
+    "qwc_circuits": 75,
+    "transpiled_2q_gates": 489,
+    "transpiled_depth": 1347,
+    "estimated_fidelity": 0.40560939472881147,
+    "expected_noiseless_energy_Ha": -637.5731902593235,
+    "casci_energy_Ha": -637.5813354347313,
+    "error_vs_casci_mHa": 8.14517540777615,
+    "estimated_qpu_time_seconds": 61.44,
+    "parameters": [
+      0.000302,
+      0.000108,
+      -0.000108,
+      -0.000302,
+      0.000108,
+      0.000302,
+      -0.000302,
+      -0.000108,
+      -0.000108,
+      -0.000302,
+      0.000108,
+      0.000302,
+      -0.000302,
+      -0.000108,
+      0.000108,
+      0.000302,
+      -0.000108,
+      -0.000302
+    ],
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "job_id": "job_spec_v2_hard_problem_1-UpCCGSD_zne",
+    "priority": 3,
+    "experiment_name": "hard_problem_1-UpCCGSD",
+    "recommendation": "RECOMMENDED: Meets fidelity threshold (> 0.3)",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "zne",
+    "resilience_options": {
+      "resilience": {
+        "measure_mitigation": true,
+        "zne_mitigation": true,
+        "zne": {
+          "extrapolator": "exponential"
+        }
+      }
+    },
+    "qwc_circuits": 75,
+    "transpiled_2q_gates": 489,
+    "transpiled_depth": 1347,
+    "estimated_fidelity": 0.40560939472881147,
+    "expected_noiseless_energy_Ha": -637.5731902593235,
+    "casci_energy_Ha": -637.5813354347313,
+    "error_vs_casci_mHa": 8.14517540777615,
+    "estimated_qpu_time_seconds": 61.44,
+    "parameters": [
+      0.000302,
+      0.000108,
+      -0.000108,
+      -0.000302,
+      0.000108,
+      0.000302,
+      -0.000302,
+      -0.000108,
+      -0.000108,
+      -0.000302,
+      0.000108,
+      0.000302,
+      -0.000302,
+      -0.000108,
+      0.000108,
+      0.000302,
+      -0.000108,
+      -0.000302
+    ],
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "job_id": "job_spec_v2_hard_problem_2-UpCCGSD_too_deep_dynamical_decoupling",
+    "priority": 4,
+    "experiment_name": "hard_problem_2-UpCCGSD_too_deep",
+    "recommendation": "NOT RECOMMENDED: too deep (fidelity < 0.3)",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "dynamical_decoupling",
+    "resilience_options": {
+      "dynamical_decoupling": {
+        "enable": true,
+        "sequence_type": "XX"
+      }
+    },
+    "qwc_circuits": 75,
+    "transpiled_2q_gates": 995,
+    "transpiled_depth": 2667,
+    "estimated_fidelity": 0.15648149426511193,
+    "expected_noiseless_energy_Ha": -637.5731962711441,
+    "casci_energy_Ha": -637.5813354347313,
+    "error_vs_casci_mHa": 8.139163587202347,
+    "estimated_qpu_time_seconds": 61.44,
+    "parameters": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "job_id": "job_spec_v2_hard_problem_2-UpCCGSD_too_deep_pauli_twirling",
+    "priority": 4,
+    "experiment_name": "hard_problem_2-UpCCGSD_too_deep",
+    "recommendation": "NOT RECOMMENDED: too deep (fidelity < 0.3)",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "pauli_twirling",
+    "resilience_options": {
+      "twirling": {
+        "enable_gates": true,
+        "enable_measure": true
+      }
+    },
+    "qwc_circuits": 75,
+    "transpiled_2q_gates": 995,
+    "transpiled_depth": 2667,
+    "estimated_fidelity": 0.15648149426511193,
+    "expected_noiseless_energy_Ha": -637.5731962711441,
+    "casci_energy_Ha": -637.5813354347313,
+    "error_vs_casci_mHa": 8.139163587202347,
+    "estimated_qpu_time_seconds": 61.44,
+    "parameters": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "status": "PREPARED (NOT SUBMITTED)"
+  },
+  {
+    "job_id": "job_spec_v2_hard_problem_2-UpCCGSD_too_deep_zne",
+    "priority": 4,
+    "experiment_name": "hard_problem_2-UpCCGSD_too_deep",
+    "recommendation": "NOT RECOMMENDED: too deep (fidelity < 0.3)",
+    "backend": "ibm_marrakesh",
+    "shots": 8192,
+    "resilience_type": "zne",
+    "resilience_options": {
+      "resilience": {
+        "measure_mitigation": true,
+        "zne_mitigation": true,
+        "zne": {
+          "extrapolator": "exponential"
+        }
+      }
+    },
+    "qwc_circuits": 75,
+    "transpiled_2q_gates": 995,
+    "transpiled_depth": 2667,
+    "estimated_fidelity": 0.15648149426511193,
+    "expected_noiseless_energy_Ha": -637.5731962711441,
+    "casci_energy_Ha": -637.5813354347313,
+    "error_vs_casci_mHa": 8.139163587202347,
+    "estimated_qpu_time_seconds": 61.44,
+    "parameters": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "status": "PREPARED (NOT SUBMITTED)"
+  }
+]
