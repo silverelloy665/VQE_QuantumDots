@@ -1,10 +1,17 @@
-.PHONY: all verify test benchmark hard hardware-prep clean
+.PHONY: all verify test benchmark hard hardware-prep round3 clean
 
 all: verify test
 
 verify:
 	python -m pytest tests/ -q
+	python scripts/20_verify_review.py
 	python scripts/10_verify_audit.py
+
+round3:
+	python scripts/20_verify_review.py
+	python scripts/run_hard_benchmark.py
+	python scripts/run_live_hardware_job.py --dry-run
+	python -m pytest tests/ -q
 
 test:
 	python -m pytest tests/ -q
