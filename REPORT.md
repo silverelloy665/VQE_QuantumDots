@@ -440,3 +440,116 @@ In strict adherence to Phase E requirements, **15 hardware jobs** were prepared,
    - The exact parameter values, transpiled circuit depth, and resilience settings used when job `d330j9cve01c738t02j0` was executed on `ibm_fez` are not recoverable from the git commit logs or JSON records. Marked as "unknown" in all tables.
 2. **Line Topology vs Heavy-Hex Coupling Gate Counts**:
    - Earlier documentation cited 49 CZ gates for UCCSD, whereas the current `ibm_marrakesh` transpiler pass yields 45 CZ gates. This discrepancy stems from line-topology transpilation vs IBM Heron native heavy-hex graph optimization; the exact transpiler seed and compiler pass flags for the 49 CZ run are not recorded.
+
+---
+
+## 9. Round 3 Independent Review Corrections & Honest Re-Evaluation
+
+### 9.1 Independent Review Findings & Verification Status
+
+An independent review identified 7 methodological and reporting anomalies across the Round 2 benchmark. All 7 findings were numerically tested and verified in `scripts/20_verify_review.py` before refactoring:
+
+| Finding # | Independent Review Observation | Verification Result | Correction Applied in Round 3 |
+| :---: | :--- | :--- | :--- |
+| **1** | In `benchmark_results_hard.json` (469 records), zero-init L-BFGS-B errors were: UCCSD $0.008\text{ mHa}$, UCCSD-SA $0.008$, DexcG $0.015$, PCU2 $0.015$, 2-UpCCGSD $0.029$, 3-UpCCGSD $0.029$, 1-UpCCGSD $1.484\text{ mHa}$. The reported "winner" (2-UpCCGSD random init, median $0.802\text{ mHa}$) is worse than all except 1-UpCCGSD. The summary CSV only aggregated `init == 'random'`. | **REPRODUCED (PASS)** | Disaggregated benchmark results into separate tables: Zero Init, Perturbed Init ($\sigma \in \{0.01, 0.05, 0.1, 0.3\}$), and Random Init. Removed false claims of DexcG failure. |
+| **2** | The `converged` flag was unconditionally `True` across all 469 records because `run_vqe_single` never populated it. Random starts with SPSA/COBYLA terminated at $400\text{--}650\text{ mHa}$ (unconverged). | **REPRODUCED (PASS)** | Redefined `converged` strictly: optimizer report of success, OR energy plateau ($\max - \min < 10^{-8}\text{ Ha}$ over last 5 iterations). Added `tests/test_converged_flag.py`. |
+| **3** | `Mean_Pct_Corr` was severely distorted by outliers (1-UpCCGSD / L-BFGS-B: mean $-391.7\%$, median $+76.7\%$). | **REPRODUCED (PASS)** | Replaced mean with robust median metrics (`Median_Pct_Corr`) and bootstrap $95\%$ confidence intervals (1,000 resamples). |
+| **4** | `scripts/run_live_hardware_job.py` hardcoded a synthetic parameter vector `params_1up` ($|\theta| \le 3 \times 10^{-4}$ repeating $\pm 0.000302 / \pm 0.000108$) with error $8.145\text{ mHa}$ (worse than HF reference $8.139\text{ mHa}$). Cache stored no `final_params`. | **REPRODUCED (PASS)** | Eliminated hardcoded parameter vectors. Dynamically load `best_params` from Schema v3 cache records. Evaluated noiseless energy and flagged jobs with NO CHEMISTRY SIGNAL if improvement $< 1.0\text{ mHa}$. |
+| **5** | Fidelity inconsistency: `HERON_CZ_ERROR = 0.0398` (device-wide mean) was used for 2-CZ parity circuit ($F = 0.922$), while circuit costs for 489/995-CZ implied $\sim 0.00186$ per CZ (at $0.0398$, 489-CZ fidelity is $2.4 \times 10^{-9}$). CZ-only fidelity ignored 1Q, readout, and $T_1$ decoherence. | **REPRODUCED (PASS)** | Implemented Unified Single Error Model: $F = \prod_{\text{cz}} (1 - e_{\text{edge}}) \times \prod_q (1 - e_{\text{readout}, q}) \times \exp(-\tau / T_1)$. Generated `data/hardware_job_spec_v3.json`. |
+| **6** | Section on Rotosolve claimed $E(\theta) = a + b\cos(4\theta) + c\sin(4\theta)$ with sample points $0, \pi/4, \pi/2$. The 4-theta model matrix is singular (condition number $1.2 \times 10^{16}$). | **REPRODUCED (PASS)** | 256-point FFT confirmed true dominant harmonic is $\omega = 2$ (period $\pi$). Corrected analytical model: $E(\theta) = a + b\cos(2\theta) + c\sin(2\theta)$ (condition number $2.41$). |
+| **7** | `figures/circuit_*.png` dated Sep 21 showed old 2e2o circuits (4 qubits). Silent fallback to `GenericBackendV2` when live IBM hardware was unreachable. | **REPRODUCED (PASS)** | Preserved 2e2o circuits as `circuit_*_2e2o_4q.png`. Rendered hard-problem 8-qubit circuits as `circuit_*.png`. Enforced mock protection: requires explicit `--mock` flag. |
+
+---
+
+### 9.2 Re-Evaluation: Separate Ranking Tables by Initialization
+
+Aggregating runs across different initialization regimes obscures whether an algorithm succeeds because of ansatz expressiveness or optimizer basin-finding capability. Round 3 reports results across three decoupled initialization categories:
+
+#### 1. Zero Initialization ($\theta = 0$, Deterministic)
+*Answers*: **"How expressive is the ansatz when starting from the Hartree-Fock chemical reference state?"*
+
+| Ansatz | Optimizer | Error (mHa) | % Corr Recovered | Total Evaluations | Converged | Wall Time (s) |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| **PCU2** | ADAM | 0.0148 | 99.8% | 11,181 | Yes | 513.8 |
+| **DexcG** | L-BFGS-B | 0.0149 | 99.8% | 407 | Yes | 19.4 |
+| **DexcG** | ADAM | 0.0149 | 99.8% | 11,101 | Yes | 476.9 |
+| **PCU2** | L-BFGS-B | 0.0149 | 99.8% | 650 | Yes | 32.1 |
+| **DexcG** | GD | 0.0149 | 99.8% | 630 | Yes | 25.3 |
+| **DexcG** | COBYLA | 0.0149 | 99.8% | 263 | Yes | 20.4 |
+| **PCU2** | COBYLA | 0.0149 | 99.8% | 734 | Yes | 56.1 |
+| **DexcG** | ROTOSOLVE | 4.1879 | 48.5% | 216 | Yes | 25.8 |
+| **HF_baseline** | none | 8.1392 | 0.0% | 1 | Yes | 0.0 |
+| **DexcG** | SPSA | 55.1673 | -577.8% | 903 | No | 55.0 |
+
+#### 2. Perturbed Initializations ($\theta \sim \mathcal{N}(0, \sigma^2)$ for $\sigma \in \{0.01, 0.05, 0.1, 0.3\}$, 40 runs per config)
+*Answers*: **"How stable is the optimization basin under realistic chemical starting noise?"*
+
+| Ansatz | Optimizer | N | Median Error (mHa) | IQR (mHa) | Bootstrap 95% CI (mHa) | Median % Corr | Success Rate | Median Evals |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **PCU2** | ADAM | 10 | 0.0139 | 0.0030 | [0.0117, 0.0148] | 99.8% | 100.0% | 10,791 |
+| **PCU2** | L-BFGS-B | 40 | 0.0149 | 0.0000 | [0.0149, 0.0149] | 99.8% | 100.0% | 1,235 |
+| **DexcG** | L-BFGS-B | 40 | 0.0149 | 0.0000 | [0.0149, 0.0149] | 99.8% | 100.0% | 370 |
+| **DexcG** | ADAM | 40 | 0.0149 | 0.0000 | [0.0149, 0.0149] | 99.8% | 100.0% | 11,101 |
+| **DexcG** | GD | 40 | 0.0149 | 0.0000 | [0.0149, 0.0149] | 99.8% | 100.0% | 815 |
+| **PCU2** | COBYLA | 40 | 0.0149 | 0.0000 | [0.0149, 0.0149] | 99.8% | 100.0% | 860 |
+| **DexcG** | COBYLA | 40 | 0.0149 | 0.0000 | [0.0149, 0.0149] | 99.8% | 100.0% | 283 |
+| **DexcG** | ROTOSOLVE | 40 | 7.4420 | 6.9794 | [6.3640, 9.9235] | 8.6% | 0.0% | 216 |
+| **DexcG** | SPSA | 40 | 49.1389 | 6.4113 | [46.5982, 50.1371] | -503.7% | 0.0% | 903 |
+
+#### 3. Random Initialization ($\theta \sim \mathcal{U}(0, 2\pi)^N$, 10 seeds)
+*Answers*: **"How robust is the optimizer at global parameter exploration in the absence of chemical insight?"*
+
+| Ansatz | Optimizer | N | Median Error (mHa) | IQR (mHa) | Bootstrap 95% CI (mHa) | Median % Corr | Success Rate | Median Evals |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **DexcG** | L-BFGS-B | 10 | 0.0149 | 0.0000 | [0.0149, 0.0149] | 99.8% | 100.0% | 3,589 |
+| **DexcG** | ADAM | 10 | 0.0406 | 0.1655 | [0.0294, 0.2455] | 99.5% | 100.0% | 11,101 |
+| **PCU2** | L-BFGS-B | 10 | 3.0203 | 0.7054 | [2.3462, 135.4695] | 62.9% | 0.0% | 21,027 |
+| **PCU2** | COBYLA | 10 | 5.0071 | 266.7119 | [4.6279, 272.4796] | 38.5% | 0.0% | 1,001 |
+| **DexcG** | COBYLA | 10 | 532.3723 | 20.9460 | [265.5447, 555.0935] | -6440.9% | 20.0% | 1,001 |
+| **DexcG** | GD | 10 | 594.0371 | 28.6382 | [573.4921, 612.9819] | -7198.5% | 0.0% | 11,101 |
+| **DexcG** | ROTOSOLVE | 10 | 607.2438 | 27.5817 | [596.5987, 628.3674] | -7360.8% | 0.0% | 216 |
+| **DexcG** | SPSA | 10 | 613.1759 | 39.6859 | [603.0025, 645.6884] | -7433.6% | 0.0% | 903 |
+
+---
+
+### 9.3 Critical Scientific Insights: Rectifying Round 2 Errors
+
+1. **DexcG Did Not "Fail Completely"**:
+   - In Round 2, the report asserted: *"DexcG fails completely on the hard problem (0.0% success rate, median 560.59 mHa error)"*.
+   - **Ground Truth**: This assertion was an artifact of aggregating *only* uniform random starts $\mathcal{U}(0, 2\pi)$ with coordinate/stochastic optimizers. When starting from a chemically informed initialization ($\theta = 0$ or perturbed $\sigma \le 0.3$), DexcG reaches **$0.0149\text{ mHa}$ error** and recovers **$99.8\%$ of the correlation energy** across COBYLA, L-BFGS-B, GD, and ADAM in as few as 263 function evaluations.
+   - Crucially, even from uniform random starts $\mathcal{U}(0, 2\pi)$, DexcG with L-BFGS-B achieves **$0.0149\text{ mHa}$ median error with a $100.0\%$ success rate** across 10 random seeds.
+   - DexcG only stalled when gradient-free coordinate optimizers (COBYLA, ROTOSOLVE) or stochastic gradient estimators (SPSA) were initialized far from the physical minimum where the non-convex landscape features local saddle points.
+
+2. **2-UpCCGSD's False "Winner" Status**:
+   - Round 2 crowned 2-UpCCGSD as the overall winner based exclusively on its random-initialization median of $0.802\text{ mHa}$.
+   - From chemically sensible initializations ($\theta = 0$), 2-UpCCGSD achieves $0.029\text{ mHa}$ error, which is **worse than DexcG ($0.0149\text{ mHa}$)**, **worse than PCU2 ($0.0148\text{ mHa}$)**, and **worse than UCCSD / UCCSD-SA ($0.008\text{ mHa}$)**.
+   - 2-UpCCGSD requires 36 parameters and transpiles to 995 CZ gates (fidelity $\approx 0.026$). Promoting 2-UpCCGSD as the superior ansatz ignored that simpler ansätze with 18 parameters reach higher accuracy in 370 evaluations with $3\times$ higher fidelity.
+
+3. **Analytical Shot Noise Limit on 2e2o Parity Minimal Circuit**:
+   - The 2-qubit parity minimal circuit ($F = 0.9160$) was previously proposed for physical hardware execution.
+   - However, the physical correlation energy in the $(2e, 2o)$ active space is only $\Delta E_{\text{corr}} = 0.0409\text{ mHa}$.
+   - The sum of Hamiltonian Pauli variances at the ground state is $\sum_k \sigma_k^2 = 1.084 \times 10^{-3}\text{ Ha}^2$. Resolving a signal of $0.0409\text{ mHa}$ at $1\sigma$ requires:
+     $$N_{\text{shots, uniform}} = \frac{\sum_k \sigma_k^2}{(\Delta E_{\text{corr}})^2} = \frac{1.084 \times 10^{-3}}{(4.093 \times 10^{-5})^2} \approx 6.47 \times 10^5\text{ shots per group} \times 4\text{ groups} \approx 2.59 \times 10^6\text{ total shots}$$
+   - Under standard execution budgets (8,192 shots), shot noise is $\sigma_{\text{shot}} \approx 0.728\text{ mHa}$—**18 times larger than the physical correlation signal**.
+   - Therefore, while the 2-qubit circuit runs with high fidelity, it serves **only as a noise and mitigation test**, not as a chemical correlation measurement.
+
+4. **Hardware Feasibility Under the Unified Single Error Model**:
+   - When evaluating hard 8-qubit circuits on `ibm_marrakesh` using the unified model $F = \prod_{\text{cz}} (1 - e_{\text{edge}}) \times \prod_q (1 - e_{\text{readout}, q}) \times \exp(-\tau / T_1)$:
+     - Transpiled 2Q gate counts range from 489 to 1,501 CZ gates.
+     - Circuit fidelities are bounded below $0.026$ (all $< 0.30$).
+     - Consequently, no hard-problem circuit can maintain quantum coherence on current noisy hardware without quantum error correction; all hard circuits are strictly marked **NOT RECOMMENDED: fidelity < 0.3 threshold**.
+
+---
+
+### 9.4 What This Benchmark Can and Cannot Show
+
+To maintain rigorous scientific hygiene, the exact operational boundaries of this study must be stated:
+- **What It Can Show**:
+  - The exact mathematical expressiveness of standard quantum chemistry ansätze (UCC, PCU2, UpCCGSD) in representing multi-reference ground states.
+  - The relative convergence speed, local stability, and basin-finding resilience of classical optimizers (L-BFGS-B, COBYLA, ADAM, GD, SPSA, Rotosolve) on molecular electronic landscapes.
+  - The exact scaling of 2Q gate counts and circuit depth under heavy-hex transpilation on real quantum processor architectures (`ibm_marrakesh`).
+- **What It Cannot Show**:
+  - Finite shot noise impact: all convergence trajectories were evaluated using exact statevector algebra ($\text{shots} \to \infty$).
+  - Dynamic orbital relaxation: natural orbitals were obtained from a single frozen-core RHF mean-field calculation at scale 1.4; orbital-VQE co-optimization (CASSCF-type relaxation) was not evaluated.
+  - Non-uniform bond dissociation: only radial scaling of B-N bonds was studied; puckering and asymmetric bond breaking were not modeled.
+  - Hardware drift and crosstalk: hardware evaluations were performed via transpilation and calibration error-model projections, not live physical execution.

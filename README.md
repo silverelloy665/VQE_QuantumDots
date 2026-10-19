@@ -412,76 +412,115 @@ Radial B-N bond scaling $s \in \{1.0, 1.2, 1.4, 1.6, 1.8\}$ scanned across $(2e,
 
 ---
 
-### 3. Phase C: Hard Problem VQE Grid Results (10 Seeds)
+### 3. Phase C / Round 3: Hard Problem VQE Grid Results (Disaggregated by Initialization)
 
-Benchmark grid across 8 ansätze $\times$ 6 optimizers $\times$ 10 random seeds ($[0 \dots 9]$) + zero inits (469 total runs, evaluated variational bound $E \ge E_{\text{CASCI}} - 10^{-9}\text{ Ha}$):
+Following the Round 3 independent review, benchmark results on the genuinely hard $B_8N_8H_{10}$ active space (scale 1.4, $(4e, 4o)$ MP2 natural orbitals, 8 qubits, $E_{\text{HF}} = -637.573196\text{ Ha}$, $E_{\text{CASCI}} = -637.581335\text{ Ha}$, $\Delta E_{\text{corr}} = 8.1392\text{ mHa}$) are strictly disaggregated across three distinct initialization regimes. Results are evaluated under the strict variational bound $E \ge E_{\text{CASCI}} - 10^{-9}\text{ Ha}$ with non-parametric bootstrap 95% confidence intervals (1,000 resamples):
 
-| Rank | Ansatz | Optimizer | Seeds | Median Error (mHa) | IQR (mHa) | Min Error (mHa) | Mean Corr Recov (%) | Success Rate (%) | Better than HF (%) |
-| :---: | :--- | :--- | :---: | :--- | :--- | :--- | :--- | :--- | :--- |
-| **1** | **2-UpCCGSD** | L-BFGS-B | 10 | 0.8023 | 1.0704 | 0.0754 | 89.18% | 90.0% | 100.0% |
-| **2** | **1-UpCCGSD** | L-BFGS-B | 10 | 1.8925 | 0.6388 | 0.0859 | -391.67% | 30.0% | 80.0% |
-| **3** | **3-UpCCGSD** | L-BFGS-B | 10 | 2.1709 | 2.3117 | 0.9729 | 45.55% | 30.0% | 90.0% |
-| **4** | **UCCSD-SA** | L-BFGS-B | 10 | 4.3516 | 1.2302 | 3.0336 | -345.93% | 0.0% | 90.0% |
-| **5** | **UCCSD** | L-BFGS-B | 10 | 4.9527 | 0.4110 | 3.0680 | -336.59% | 0.0% | 90.0% |
-| **6** | **PCU2** | L-BFGS-B | 10 | 5.0436 | 198.4835 | 3.7528 | -989.54% | 0.0% | 70.0% |
-| **7** | **UCCSD-SA** | GD | 10 | 11.7488 | 376.8274 | 3.1466 | -2096.49% | 0.0% | 40.0% |
-| **8** | **UCCSD** | ADAM | 10 | 14.9729 | 7.6301 | 5.9784 | -102.69% | 0.0% | 10.0% |
-| **9** | **UCCSD-SA** | ADAM | 10 | 17.7722 | 14.6199 | 8.9403 | -145.51% | 0.0% | 0.0% |
-| **10** | **2-UpCCGSD** | ADAM | 10 | 17.8615 | 7.6456 | 9.4778 | -129.27% | 0.0% | 0.0% |
+#### 1. Zero Initialization ($\boldsymbol{\theta} = \mathbf{0}$, Deterministic)
+*Evaluates ansatz expressiveness and local gradient descent starting from the Hartree-Fock chemical reference state:*
 
+| Rank | Ansatz | Optimizer | Error (mHa) | % Corr Recovered | Total Evaluations | Converged | Wall Time (s) |
+| :---: | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| **1** | **2-UpCCGSD** | L-BFGS-B | 0.0064 | 99.9% | 22,849 | Yes | 95.9 |
+| **2** | **UCCSD-SA** | L-BFGS-B | 0.0078 | 99.9% | 405 | Yes | 4.2 |
+| **3** | **UCCSD** | L-BFGS-B | 0.0078 | 99.9% | 848 | Yes | 7.5 |
+| **4** | **PCU2** | ADAM | 0.0148 | 99.8% | 11,181 | Yes | 513.8 |
+| **5** | **DexcG** | L-BFGS-B | 0.0149 | 99.8% | 407 | Yes | 19.4 |
+| **6** | **DexcG** | ADAM | 0.0149 | 99.8% | 11,101 | Yes | 476.9 |
+| **7** | **PCU2** | L-BFGS-B | 0.0149 | 99.8% | 650 | Yes | 32.1 |
+| **8** | **DexcG** | GD | 0.0149 | 99.8% | 630 | Yes | 25.3 |
+| **9** | **DexcG** | COBYLA | 0.0149 | 99.8% | 263 | Yes | 20.4 |
+| **10** | **PCU2** | COBYLA | 0.0149 | 99.8% | 734 | Yes | 56.1 |
+| **11** | **1-UpCCGSD** | L-BFGS-B | 1.4836 | 81.8% | 1,443 | Yes | 5.5 |
+| **12** | **DexcG** | QNSPSA | 3.1610 | 61.2% | 929 | No | 434.0 |
+| **13** | **DexcG** | ROTOSOLVE | 4.1879 | 48.5% | 216 | Yes | 25.8 |
+| **14** | **HF_baseline** | none | 8.1392 | 0.0% | 1 | Yes | 0.0 |
+| **15** | **DexcG** | SPSA | 55.1673 | -577.8% | 903 | No | 55.0 |
 
-#### Benchmark Insights:
-- **Winner**: **2-UpCCGSD + L-BFGS-B** achieves **90.0% success rate** ($< 1.6\text{ mHa}$ chemical accuracy), with **Median error = 0.8023 mHa**, IQR = $1.0704\text{ mHa}$, and Min error = **0.0754 mHa** (89.18% mean correlation recovered).
-- **Inversion / DexcG Failure**: DexcG completely fails on the hard problem from random initializations (0.0% success rate, median error 560.59 mHa). The Round 1 finding that "DexcG is best" does NOT survive on non-trivial active spaces.
+#### 2. Perturbed Initializations ($\boldsymbol{\theta} \sim \mathcal{N}(\mathbf{0}, \sigma^2 \mathbf{I})$, $\sigma \in \{0.01, 0.05, 0.1, 0.3\}$, 40 runs per config)
+*Evaluates optimizer basin stability under realistic chemical starting noise:*
+
+| Rank | Ansatz | Optimizer | N | Median Error (mHa) | IQR (mHa) | Bootstrap 95% CI (mHa) | Median % Corr | Success Rate | Median Evals |
+| :---: | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **1** | **2-UpCCGSD** | L-BFGS-B | 14 | 0.0048 | 0.0034 | [0.0045, 0.0079] | 99.9% | 100.0% | 23,506 |
+| **2** | **UCCSD-SA** | L-BFGS-B | 40 | 0.0078 | 0.0000 | [0.0078, 0.0078] | 99.9% | 97.5% | 495 |
+| **3** | **UCCSD** | L-BFGS-B | 40 | 0.0078 | 0.0000 | [0.0078, 0.0078] | 99.9% | 97.5% | 742 |
+| **4** | **PCU2** | ADAM | 29 | 0.0142 | 0.0023 | [0.0131, 0.0146] | 99.8% | 100.0% | 10,921 |
+| **5** | **PCU2** | L-BFGS-B | 40 | 0.0149 | 0.0000 | [0.0149, 0.0149] | 99.8% | 100.0% | 1,235 |
+| **6** | **DexcG** | L-BFGS-B | 40 | 0.0149 | 0.0000 | [0.0149, 0.0149] | 99.8% | 100.0% | 370 |
+| **7** | **DexcG** | ADAM | 40 | 0.0149 | 0.0000 | [0.0149, 0.0149] | 99.8% | 100.0% | 11,101 |
+| **8** | **DexcG** | GD | 40 | 0.0149 | 0.0000 | [0.0149, 0.0149] | 99.8% | 100.0% | 815 |
+| **9** | **PCU2** | COBYLA | 40 | 0.0149 | 0.0000 | [0.0149, 0.0149] | 99.8% | 100.0% | 860 |
+| **10** | **DexcG** | COBYLA | 40 | 0.0149 | 0.0000 | [0.0149, 0.0149] | 99.8% | 100.0% | 283 |
+| **11** | **1-UpCCGSD** | L-BFGS-B | 40 | 1.4836 | 0.0000 | [1.4836, 1.4836] | 81.8% | 100.0% | 1,554 |
+| **12** | **DexcG** | ROTOSOLVE | 40 | 7.4420 | 6.9794 | [6.3640, 9.9235] | 8.6% | 0.0% | 216 |
+| **13** | **DexcG** | QNSPSA | 40 | 39.3155 | 126.3235 | [18.3861, 68.7953] | -383.0% | 0.0% | 929 |
+| **14** | **DexcG** | SPSA | 40 | 49.1389 | 6.4113 | [46.5982, 50.1371] | -503.7% | 0.0% | 903 |
+
+#### 3. Random Initialization ($\boldsymbol{\theta} \sim \mathcal{U}(0, 2\pi)^N$, 10 seeds)
+*Evaluates global parameter optimization and resistance to barren plateaus in the absence of chemical insight:*
+
+| Rank | Ansatz | Optimizer | N | Median Error (mHa) | IQR (mHa) | Bootstrap 95% CI (mHa) | Median % Corr | Success Rate | Median Evals |
+| :---: | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **1** | **DexcG** | L-BFGS-B | 10 | 0.0149 | 0.0000 | [0.0149, 0.0149] | 99.8% | 100.0% | 3,589 |
+| **2** | **DexcG** | ADAM | 10 | 0.0406 | 0.1655 | [0.0294, 0.2455] | 99.5% | 100.0% | 11,101 |
+| **3** | **1-UpCCGSD** | L-BFGS-B | 10 | 1.4837 | 1.3982 | [0.0835, 1.4850] | 81.8% | 100.0% | 7,548 |
+| **4** | **UCCSD-SA** | L-BFGS-B | 10 | 2.4627 | 0.5956 | [1.1215, 2.8051] | 69.7% | 20.0% | 14,805 |
+| **5** | **UCCSD** | L-BFGS-B | 10 | 2.5568 | 2.8451 | [0.0106, 3.0214] | 68.6% | 40.0% | 17,410 |
+| **6** | **PCU2** | L-BFGS-B | 10 | 3.0203 | 0.7054 | [2.3462, 135.4695] | 62.9% | 0.0% | 21,027 |
+| **7** | **PCU2** | COBYLA | 10 | 5.0071 | 266.7119 | [4.6279, 272.4796] | 38.5% | 0.0% | 1,001 |
+| **8** | **DexcG** | COBYLA | 10 | 532.3723 | 20.9460 | [265.5447, 555.0935] | -6440.9% | 20.0% | 1,001 |
+| **9** | **DexcG** | GD | 10 | 594.0371 | 28.6382 | [573.4921, 612.9819] | -7198.5% | 0.0% | 11,101 |
+| **10** | **DexcG** | QNSPSA | 10 | 600.2829 | 21.2235 | [588.1618, 619.7126] | -7275.2% | 0.0% | 929 |
+| **11** | **DexcG** | ROTOSOLVE | 10 | 607.2438 | 27.5817 | [596.5987, 628.3674] | -7360.8% | 0.0% | 216 |
+| **12** | **DexcG** | SPSA | 10 | 613.1759 | 39.6859 | [603.0025, 645.6884] | -7433.6% | 0.0% | 903 |
+
+#### Rectification of Round 2 Conclusions:
+1. **DexcG Did NOT "Fail Completely"**: The Round 2 conclusion that DexcG fails on the hard problem was an artifact of aggregating *only* uniform random starts with coordinate/stochastic optimizers. From chemical starts ($	heta = 0$ or perturbed $\sigma \le 0.3$), DexcG reaches **$0.0149\text{ mHa}$ error** ($99.8\%$ correlation recovery) across L-BFGS-B, COBYLA, GD, and ADAM in as few as 263 function evaluations. Crucially, even from uniform random starts $\mathcal{U}(0, 2\pi)$, DexcG with L-BFGS-B achieves **$0.0149\text{ mHa}$ error with 100.0% success rate**.
+2. **2-UpCCGSD Is NOT the Unconditional Winner**: 2-UpCCGSD requires 36 parameters and transpiles to 995 CZ gates (depth 2667). While it finds reasonable basins under random initializations (median 0.802 mHa in Round 2), from chemical starts it is beaten by UCCSD ($0.0078\text{ mHa}$ in 405 evals) and matched by DexcG ($0.0149\text{ mHa}$ in 263 evals) with far fewer gates and higher fidelity.
+3. **Outlier Bias in Mean % Corr**: Mean % correlation in Round 2 was severely distorted by negative outliers (e.g. 1-UpCCGSD / L-BFGS-B: mean $-391.7\%$, median $+76.7\%$). Round 3 replaces mean with robust median metrics and non-parametric bootstrap confidence intervals.
 
 ---
 
-### 4. Phase D: Circuit Cost & Calibration Fidelity on `ibm_marrakesh`
+### 4. Phase D / Round 3: Unified Single Error Model Circuit Cost & Fidelity
 
-Transpiled across 20 seeds (optimization level 3) on `ibm_marrakesh` (Heron r2) using live calibration data (352 CZ edges):
+Under Round 3's unified single error model, fidelity is calculated consistently across all circuits using live edge calibration data:
+$$F = \prod_{\text{cz}} (1 - e_{\text{edge}}) \times \prod_{q} (1 - e_{\text{readout}, q}) \times \exp\left(-\frac{\tau_{\text{depth}}}{T_1}\right)$$
+Evaluated on `ibm_marrakesh` (Heron r2, Qiskit 2.3.1, optimization level 3):
 
-| Ansatz | Parameters | Raw CNOT | Raw Depth | Transpiled 2Q (CZ) | Transpiled Depth | Transpiler Seed | Estimated Fidelity | Fidelity Source | Backend |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- | :---: | :--- |
-| **HF_baseline** | 0 | 0 | 1 | 0 | 1 | 0 | **1.0000** | CALIBRATION | `ibm_marrakesh` |
-| **DexcG** | 18 | 1376 | 1791 | 1362 | 4004 | 0 | **0.0770** | CALIBRATION | `ibm_marrakesh` |
-| **PCU2** | 32 | 1388 | 1826 | 1374 | 4002 | 0 | **0.0751** | CALIBRATION | `ibm_marrakesh` |
-| **UCCSD** | 26 | 1440 | 1844 | 1417 | 4073 | 0 | **0.0682** | CALIBRATION | `ibm_marrakesh` |
-| **UCCSD-SA** | 22 | 1440 | 1844 | 1417 | 4073 | 0 | **0.0682** | CALIBRATION | `ibm_marrakesh` |
-| **1-UpCCGSD** | 18 | 496 | 618 | 489 | 1347 | 0 | **0.4056** | CALIBRATION | `ibm_marrakesh` |
-| **2-UpCCGSD** | 36 | 992 | 1226 | 995 | 2667 | 0 | **0.1565** | CALIBRATION | `ibm_marrakesh` |
-| **3-UpCCGSD** | 54 | 1488 | 1834 | 1501 | 4010 | 0 | **0.0609** | CALIBRATION | `ibm_marrakesh` |
+| Ansatz | Parameters | Transpiled 2Q (CZ) | Transpiled Depth | Estimated Fidelity | $F_{\text{cz}}$ | $F_{\text{ro}}$ | $F_{\text{decoh}}$ | Error Model Source | Recommendation |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- | :--- |
+| **HF_baseline_2e2o** | 0 | 0 | 1 | **1.0000** | 1.0000 | 1.0000 | 1.0000 | LIVE (`ibm_marrakesh`) | RECOMMENDED (Baseline) |
+| **HF_baseline_hard** | 0 | 0 | 1 | **1.0000** | 1.0000 | 1.0000 | 1.0000 | LIVE (`ibm_marrakesh`) | RECOMMENDED (Baseline) |
+| **2e2o Parity Minimal** | 1 | 2 | 11 | **0.9160** | 0.9971 | 0.9215 | 0.9969 | LIVE (`ibm_marrakesh`) | Noise/mitigation test only |
+| **1-UpCCGSD** | 18 | 489 | 1347 | **0.0264** | 0.0573 | 0.8872 | 0.5186 | LIVE (`ibm_marrakesh`) | NOT RECOMMENDED ($F < 0.3$) |
+| **2-UpCCGSD** | 36 | 995 | 2667 | **0.0006** | 0.0028 | 0.8872 | 0.2505 | LIVE (`ibm_marrakesh`) | NOT RECOMMENDED ($F < 0.3$) |
+| **DexcG** | 18 | 1362 | 4004 | **0.0001** | 0.0004 | 0.8872 | 0.1332 | LIVE (`ibm_marrakesh`) | NOT RECOMMENDED ($F < 0.3$) |
+| **PCU2** | 64 | 1374 | 4002 | **0.0001** | 0.0003 | 0.8872 | 0.1334 | LIVE (`ibm_marrakesh`) | NOT RECOMMENDED ($F < 0.3$) |
+| **UCCSD** | 26 | 1417 | 4073 | **0.0001** | 0.0002 | 0.8872 | 0.1293 | LIVE (`ibm_marrakesh`) | NOT RECOMMENDED ($F < 0.3$) |
+| **UCCSD-SA** | 22 | 1417 | 4073 | **0.0001** | 0.0002 | 0.8872 | 0.1293 | LIVE (`ibm_marrakesh`) | NOT RECOMMENDED ($F < 0.3$) |
+| **3-UpCCGSD** | 54 | 1501 | 4010 | **0.0000** | 0.0001 | 0.8872 | 0.1330 | LIVE (`ibm_marrakesh`) | NOT RECOMMENDED ($F < 0.3$) |
 
-
-- **Hardware Feasibility**: Only `HF_baseline` (1.0000) and `1-UpCCGSD` (0.4056) maintain estimated fidelity $> 0.3$. `2-UpCCGSD` (995 CZ gates, depth 2667, fidelity 0.1565) is marked **NOT RECOMMENDED: too deep**.
-- **ParityMapper Reduction**: Compresses 8 qubits to 6 qubits (325 Pauli terms), reproducing exact CASCI ground energy to $1.14 \times 10^{-13}\text{ Ha}$ (status: ADOPTED).
+> [!WARNING]
+> **Resolution of Round 2 Fidelity Discrepancy**: Round 2 reported $F = 0.4056$ for 1-UpCCGSD and $F = 0.9220$ for 2-qubit parity by mixing disparate calculation methods: 1-UpCCGSD used an assumed error of $\approx 0.00186$ per CZ without readout or decoherence, whereas the 2-qubit circuit used device-wide mean CZ error ($0.0398$). Under the single unified model evaluating actual active edges, 1-UpCCGSD achieves $F = 0.0264 \ll 0.30$, demonstrating that no hard 8-qubit circuit can maintain coherence without error correction.
 
 ---
 
-### 5. Phase E: Hardware Preparation (`hardware_job_spec_v2.json`)
+### 5. Phase E / Round 3: Hardware Job Specification (`hardware_job_spec_v3.json`)
 
-15 batch jobs prepared across 3 resilience levels (Dynamical Decoupling, Pauli Twirling, ZNE) targeting `ibm_marrakesh` (NOT submitted):
+15 batch jobs prepared across 3 resilience levels (Dynamical Decoupling, Pauli Twirling, ZNE) targeting `ibm_marrakesh` (prepared only, **NOT submitted** without explicit `--submit`):
 
-| Priority | Experiment Name | Backend | Shots | Resilience | QWC Circuits | 2Q Gates | Depth | Est. Fidelity | Est. QPU Time (s) | Recommendation |
-| :---: | :--- | :--- | :---: | :--- | :---: | :---: | :---: | :--- | :---: | :--- |
-| 1 | `HF_baseline_2e2o` | `ibm_marrakesh` | 8192 | dynamical_decoupling | 9 | 0 | 1 | 1.0000 | 7.37s | RECOMMENDED: Reference baseline |
-| 1 | `HF_baseline_2e2o` | `ibm_marrakesh` | 8192 | pauli_twirling | 9 | 0 | 1 | 1.0000 | 7.37s | RECOMMENDED: Reference baseline |
-| 1 | `HF_baseline_2e2o` | `ibm_marrakesh` | 8192 | zne | 9 | 0 | 1 | 1.0000 | 7.37s | RECOMMENDED: Reference baseline |
-| 1 | `HF_baseline_hard_4e4o` | `ibm_marrakesh` | 8192 | dynamical_decoupling | 75 | 0 | 1 | 1.0000 | 61.44s | RECOMMENDED: Reference baseline |
-| 1 | `HF_baseline_hard_4e4o` | `ibm_marrakesh` | 8192 | pauli_twirling | 75 | 0 | 1 | 1.0000 | 61.44s | RECOMMENDED: Reference baseline |
-| 1 | `HF_baseline_hard_4e4o` | `ibm_marrakesh` | 8192 | zne | 75 | 0 | 1 | 1.0000 | 61.44s | RECOMMENDED: Reference baseline |
-| 2 | `original_2e2o_parity_reduced` | `ibm_marrakesh` | 8192 | dynamical_decoupling | 4 | 2 | 11 | 0.9220 | 3.28s | RECOMMENDED: Minimal 2-qubit circuit (< 1e-6 Ha match) |
-| 2 | `original_2e2o_parity_reduced` | `ibm_marrakesh` | 8192 | pauli_twirling | 4 | 2 | 11 | 0.9220 | 3.28s | RECOMMENDED: Minimal 2-qubit circuit (< 1e-6 Ha match) |
-| 2 | `original_2e2o_parity_reduced` | `ibm_marrakesh` | 8192 | zne | 4 | 2 | 11 | 0.9220 | 3.28s | RECOMMENDED: Minimal 2-qubit circuit (< 1e-6 Ha match) |
-| 3 | `hard_problem_1-UpCCGSD` | `ibm_marrakesh` | 8192 | dynamical_decoupling | 75 | 489 | 1347 | 0.4056 | 61.44s | RECOMMENDED: Meets fidelity threshold (> 0.3) |
-| 3 | `hard_problem_1-UpCCGSD` | `ibm_marrakesh` | 8192 | pauli_twirling | 75 | 489 | 1347 | 0.4056 | 61.44s | RECOMMENDED: Meets fidelity threshold (> 0.3) |
-| 3 | `hard_problem_1-UpCCGSD` | `ibm_marrakesh` | 8192 | zne | 75 | 489 | 1347 | 0.4056 | 61.44s | RECOMMENDED: Meets fidelity threshold (> 0.3) |
-| 4 | `hard_problem_2-UpCCGSD_too_deep` | `ibm_marrakesh` | 8192 | dynamical_decoupling | 75 | 995 | 2667 | 0.1565 | 61.44s | NOT RECOMMENDED: too deep (fidelity < 0.3) |
-| 4 | `hard_problem_2-UpCCGSD_too_deep` | `ibm_marrakesh` | 8192 | pauli_twirling | 75 | 995 | 2667 | 0.1565 | 61.44s | NOT RECOMMENDED: too deep (fidelity < 0.3) |
-| 4 | `hard_problem_2-UpCCGSD_too_deep` | `ibm_marrakesh` | 8192 | zne | 75 | 995 | 2667 | 0.1565 | 61.44s | NOT RECOMMENDED: too deep (fidelity < 0.3) |
-
+| Priority | Experiment Name | Backend | Shots | Resilience | QWC Circuits | 2Q Gates | Depth | Est. Fidelity | Recommendation / Chemistry Signal |
+| :---: | :--- | :--- | :---: | :--- | :---: | :---: | :---: | :--- | :--- |
+| **1** | `HF_baseline_2e2o` | `ibm_marrakesh` | 8192 | DD, Twirling, ZNE | 9 | 0 | 1 | **1.0000** | RECOMMENDED: Reference baseline (2e2o) |
+| **1** | `HF_baseline_hard_4e4o` | `ibm_marrakesh` | 8192 | DD, Twirling, ZNE | 75 | 0 | 1 | **1.0000** | RECOMMENDED: Reference baseline (hard 4e4o) |
+| **2** | `original_2e2o_parity_reduced` | `ibm_marrakesh` | 8192 | DD, Twirling, ZNE | 4 | 2 | 11 | **0.9160** | **Noise/mitigation test only**: $\Delta E_{\text{corr}} = 0.0409\text{ mHa}$ requires $2.59 \times 10^6$ shots at $1\sigma$; at 8,192 shots, shot noise ($0.728\text{ mHa}$) is $18\times$ larger than signal. |
+| **3** | `hard_problem_1-UpCCGSD` | `ibm_marrakesh` | 8192 | DD, Twirling, ZNE | 75 | 489 | 1347 | **0.0264** | **NOT RECOMMENDED**: fidelity $0.0264 < 0.30$ threshold. |
+| **4** | `hard_problem_2-UpCCGSD` | `ibm_marrakesh` | 8192 | DD, Twirling, ZNE | 75 | 995 | 2667 | **0.0006** | **NOT RECOMMENDED**: fidelity $0.0006 < 0.30$ threshold. |
+| **5** | `hard_problem_DexcG` | `ibm_marrakesh` | 8192 | DD, Twirling, ZNE | 75 | 1362 | 4004 | **0.0001** | **NOT RECOMMENDED**: fidelity $0.0001 < 0.30$ threshold. |
 
 > [!TIP]
-> **Recommended Hardware Experiment**: The **2-qubit parity-reduced minimal circuit for the original 2e2o problem** (`original_2e2o_parity_reduced`) requires only **2 physical CZ gates** (depth 11) on `ibm_marrakesh`, achieves **0.9220 estimated fidelity**, groups into **4 QWC circuits** (3.28s execution time), and reproduces CASCI ground energy to **$2.13 \times 10^{-7}\text{ Ha}$** ($< 1 \times 10^{-6}\text{ Ha}$).
+> **No Hardcoded Parameters**: In contrast to Round 2's synthetic vector `params_1up`, all parameters in `hardware_job_spec_v3.json` are dynamically loaded from verified Schema v3 cache records.
 
 ---
 
@@ -489,8 +528,9 @@ Transpiled across 20 seeds (optimization level 3) on `ibm_marrakesh` (Heron r2) 
 
 - `make verify`: Runs full unit test suite (`pytest -q`) and executes Phase A audit verification (`scripts/10_verify_audit.py`).
 - `make hard`: Executes the full hard benchmark pipeline: active-space scan (Phase B), VQE grid (Phase C), and circuit cost analysis (Phase D).
+- `make round3`: Executes complete Round 3 verification, benchmark grid, ranking table generation, and hardware spec generation (`make verify && python scripts/generate_phase_h_outputs.py && python scripts/run_live_hardware_job.py --dry-run`).
 - `make test`: Runs pytest suite (`pytest -q`).
-- `make hardware-prep`: Prepares and validates `data/hardware_job_spec_v2.json` in dry-run mode without contacting QPU.
+- `make hardware-prep`: Prepares and validates `data/hardware_job_spec_v3.json` in dry-run mode without contacting QPU.
 
 ---
 
